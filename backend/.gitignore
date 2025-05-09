@@ -4,12 +4,32 @@ vendor/
 .pnp
 .pnp.js
 
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pythonenv*
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+pyrightconfig.json
+
 # Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.backup
 
 # Logs
 logs
@@ -17,6 +37,8 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # Runtime data
 pids
@@ -28,26 +50,36 @@ pids
 dist/
 build/
 out/
+public/dist/
 
 # Coverage directory
 coverage/
+.nyc_output/
 
 # Database files
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
 # IDE and editor files
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 *.sublime-project
 *.sublime-workspace
 *.swp
 *.swo
 .DS_Store
+Thumbs.db
 
 # Package files
+package-lock.json
+yarn.lock
 *.tgz
 *.zip
 *.tar.gz
@@ -55,3 +87,18 @@ coverage/
 # Temp files
 tmp/
 temp/
+.cache/
+
+# Testing
+.coverage
+.eslintcache
+/playwright-report/
+/test-results/
+
+# Miscellaneous
+.npmrc
+.yarnrc
+.node_repl_history
+
+# FastAPI specific
+/uploads/
