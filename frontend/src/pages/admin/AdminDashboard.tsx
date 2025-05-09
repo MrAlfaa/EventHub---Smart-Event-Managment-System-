@@ -1,0 +1,54 @@
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import AdminOverview from "@/components/admin/AdminOverview";
+import AdminUsers from "@/components/admin/AdminUsers";
+import AdminServiceProviders from "@/components/admin/AdminSeviceProviders";
+import ServiceProviderApproval from "@/components/admin/ServiceProviderApproval";
+import AdminPaymentDetails from "@/components/admin/AdminPaymentDetails";
+import AdminBookings from "@/components/admin/AdminBookings";
+import PromotionsManager from "@/components/admin/PromotionsManager";
+import AdminSettings from "@/components/admin/AdminSettings";
+import ServiceTypesManager from "@/components/admin/ServiceTypesManager";
+import AdminNotifications from "@/components/admin/AdminNotifications";
+import { toast } from "sonner";
+
+const AdminDashboard = () => {
+  const { isAuthenticated, isAdmin } = useAuthStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error("Please login to access the admin dashboard");
+      navigate("/admin/login");
+    } else if (!isAdmin) {
+      toast.error("You don't have permission to access the admin dashboard");
+      navigate("/");
+    }
+  }, [isAuthenticated, isAdmin, navigate]);
+
+  if (!isAuthenticated || !isAdmin) {
+    return null;
+  }
+
+  return (
+    <AdminLayout>
+      <Routes>
+        <Route path="/" element={<AdminOverview />} />
+        <Route path="/users" element={<AdminUsers />} />
+        <Route path="/service-providers" element={<AdminServiceProviders />} />
+        <Route path="/approvals" element={<ServiceProviderApproval />} />
+        <Route path="/payment-details" element={<AdminPaymentDetails />} />
+        <Route path="/bookings" element={<AdminBookings />} />
+        <Route path="/promotions" element={<PromotionsManager />} />
+        <Route path="/service-types" element={<ServiceTypesManager />} />
+        <Route path="/notifications" element={<AdminNotifications />} />
+        <Route path="/settings" element={<AdminSettings />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    </AdminLayout>
+  );
+};
+
+export default AdminDashboard;
