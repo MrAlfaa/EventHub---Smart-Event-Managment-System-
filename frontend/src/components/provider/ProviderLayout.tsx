@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface ProviderLayoutProps {
   children: React.ReactNode;
@@ -37,15 +38,20 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   const { user, setUser } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
+  // Call useAuthStore at the component level, not inside handleLogout
+  const { logout: zustandLogout } = useAuthStore();
 
   const handleLogout = () => {
+    // Use the already retrieved zustandLogout function
+    zustandLogout();
     setUser(null);
+    
+    // Clear localStorage explicitly
+    localStorage.removeItem('eventHub_token');
+    localStorage.removeItem('eventHub_user');
+    
     toast.success("Logged out successfully");
     navigate("/login");
-  };
-
-  const visitHomePage = () => {
-    navigate("/home");
   };
 
   const isActive = (path: string) => {
@@ -100,14 +106,6 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
           </SidebarContent>
           
           <SidebarFooter>
-            <Button 
-              variant="outline" 
-              className="flex w-full items-center justify-start gap-2 mb-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200" 
-              onClick={visitHomePage}
-            >
-              <Home size={16} />
-              <span>Visit Website Home</span>
-            </Button>
             <Button 
               variant="outline" 
               className="flex w-full items-center justify-start gap-2" 

@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "./providers/AppProvider";
 import { ZustandProvider } from "./providers/ZustandProvider";
-import { useEffect } from "react";
+import { useEffect,useState } from "react";
 import { useAuthStore } from "./store/useAuthStore";
 import userService from "./services/userService";
 
@@ -25,7 +25,7 @@ import CloudSpace from "./pages/CloudSpace";
 import ResetPassword from "./components/auth/ResetPassword";
 import PublicEvents from "./pages/PublicEvents";
 import Promotions from "./pages/Promotions";
-
+import SuperAdminSetup from "./components/admin/SuperAdminSetup"
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
@@ -41,6 +41,9 @@ function App() {
             <Toaster position="top-center" />
             <AuthInitializer />
             <Routes>
+              {/* Super Admin Setup Route */}
+              <Route path="/setup-admin" element={<SuperAdminSetup />} />
+              
               {/* Auth Routes - These are the only routes accessible without login */}
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<Navigate to="/login" replace />} />
@@ -153,6 +156,14 @@ function App() {
                 }
               />
               <Route 
+                path="/provider/dashboard/*" 
+                element={
+                  <ProtectedRoute requiredRole="service_provider">
+                    <ProviderDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
                 path="/provider/profile-setup" 
                 element={
                   <ProtectedRoute requiredRole="service_provider">
@@ -171,7 +182,7 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              
+              <Route path="/setup-admin" element={<SuperAdminSetup />} />
               {/* Catch all unknown routes and redirect to login */}
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
@@ -185,6 +196,7 @@ function App() {
 // New component to handle auth initialization
 function AuthInitializer() {
   const { setUser } = useAuthStore();
+  const [isInitialized, setIsInitialized] = useState(false);
   
   useEffect(() => {
     const token = localStorage.getItem('eventHub_token');
@@ -199,14 +211,53 @@ function AuthInitializer() {
           // Token might be invalid or expired
           localStorage.removeItem('eventHub_token');
           localStorage.removeItem('eventHub_user');
+        } finally {
+          setIsInitialized(true);
         }
       };
       
       fetchCurrentUser();
+    } else {
+      setIsInitialized(true);
     }
   }, [setUser]);
   
-  return null;
+  // Add token refresh mechanism
+  useEffect(() => {
+    // Set up a periodic token refresh (every 30 minutes)
+    const refreshInterval = setInterval(() => {
+      const token = localStorage.getItem('eventHub_token');
+      if (token) {
+        // Implement a token refresh endpoint in your backend
+        // and call it here to extend the session
+        userService.refreshToken()
+          .catch(() => {
+            // If refresh fails, don't immediately log out
+            // This prevents disrupting the user experience
+            console.error("Token refresh failed");
+          });
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+    
+    return () => clearInterval(refreshInterval);
+  }, []);
+  
+  useEffect(() => {
+    // Remove any duplicate scripts when the component mounts
+    const duplicateScript = document.getElementById("fido2-page-script-registration");
+    if (duplicateScript) {
+      duplicateScript.remove();
+    }
+  }, []);
+  
+  return isInitialized ? null : (
+    <div className="fixed inset-0 flex items-center justify-center bg-white">
+      <div className="text-center">
+        <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent mx-auto"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
 }
 
 export default App;

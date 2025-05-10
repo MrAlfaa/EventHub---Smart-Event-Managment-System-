@@ -37,6 +37,27 @@ const userService = {
     const response = await userApi.put('/users/me', updateData);
     return response.data;
   },
+
+  // Add this function to userService.ts
+  refreshToken: async (): Promise<void> => {
+    const response = await userApi.post('/auth/refresh-token');
+    const { token } = response.data;
+    
+    if (token) {
+      localStorage.setItem('eventHub_token', token);
+    }
+  },
+
+  // Add this function to userService
+  checkSuperAdminSetupNeeded: async (): Promise<boolean> => {
+    try {
+      const response = await userApi.get('/admin/check-superadmin');
+      return !response.data.exists;
+    } catch (error) {
+      console.error('Error checking super admin setup:', error);
+      return false; // Default to false on error
+    }
+  },
 };
 
 export default userService;

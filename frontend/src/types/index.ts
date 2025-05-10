@@ -8,12 +8,12 @@ export interface User {
   profileImage?: string;
   role: 'user' | 'service_provider' | 'admin' | 'super_admin';
 }
+import { ReactNode } from "react";
 
 // Service Provider Types
 export interface ServiceProvider {
   currency: string;
   packageName: ReactNode;
-  price: any;
   price: any;
   packagePrice: any;
   id: string;
