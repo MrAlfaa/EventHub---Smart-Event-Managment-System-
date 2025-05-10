@@ -6,6 +6,8 @@ import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Label } from "@/components/ui/label";
+import axios from "axios";
+
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,7 +18,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const { login } = useAuthStore();
+  const { login, setUser } = useAuthStore();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -41,15 +43,30 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      await login({
+      // Get the response from login function
+      const response = await login({
         email: formData.email,
         password: formData.password
       });
       
+      // Correctly use the user property from the response
+      setUser(response.user);
+      
       toast.success("Login successful!");
-      navigate("/home"); // Redirect to the Index page
+      
+      if (response.user.role === 'service_provider') {
+        navigate("/provider");
+      } else if (response.user.role === 'admin') {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/home");
+      }
     } catch (error) {
-      toast.error("Invalid credentials. Please try again.");
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(error.response.data.detail || "Invalid credentials");
+      } else {
+        toast.error("Login failed. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }

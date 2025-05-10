@@ -66,11 +66,15 @@ const authService = {
   // Login user
   login: async (credentials: LoginCredentials): Promise<{ user: User; token: string }> => {
     const response = await authApi.post('/auth/login', credentials);
+    
+    // Make sure these properties exist in the response data
     const { user, token } = response.data;
     
     // Store token in localStorage
     localStorage.setItem('eventHub_token', token);
+    localStorage.setItem('eventHub_user', JSON.stringify(user));
     
+    // Return both properties
     return { user, token };
   },
 

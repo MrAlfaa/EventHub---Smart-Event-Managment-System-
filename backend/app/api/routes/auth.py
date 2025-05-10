@@ -6,6 +6,7 @@ from app.core.security import verify_password, create_access_token
 from app.db.mongodb import get_database
 from datetime import timedelta
 from app.core.config import settings
+from app.api.deps import get_current_user
 
 router = APIRouter()
 
@@ -42,4 +43,17 @@ async def login(login_data: LoginRequest):
         user_dict["id"] = str(user_dict["_id"])
         del user_dict["_id"]
     
+    # Make sure you're returning both user and token
     return {"user": user_dict, "token": access_token}
+
+@router.post("/auth/refresh-token", response_model=dict)
+async def refresh_token(current_user: UserInDB = Depends(get_current_user)):
+    # Create a new access token
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        subject=str(current_user.id),
+        role=current_user.role,
+        expires_delta=access_token_expires
+    )
+    
+    return {"token": access_token}

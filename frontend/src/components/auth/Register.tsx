@@ -132,7 +132,6 @@ const Register = () => {
   setIsSubmitting(true);
   
   if (activeTab === "service_provider") {
-    // Service provider registration logic (unchanged)
     try {
       await registerServiceProvider({
         name: providerData.businessName,
@@ -146,7 +145,8 @@ const Register = () => {
       });
       
       toast.success("Service provider account created successfully! Please log in to continue with profile setup.");
-      navigate("/login");
+      // Explicitly navigate to login with a query parameter
+      navigate("/login?type=provider");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         toast.error(error.response.data.detail || "Registration failed. Please check your information.");

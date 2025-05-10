@@ -1,8 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode,useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp } from "@/providers/AppProvider";
 import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
+import userService from "@/services/userService";
+import {  useNavigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -12,15 +14,36 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated: appIsAuthenticated, user: appUser } = useApp();
   const { isAuthenticated: storeIsAuthenticated, isAdmin: storeIsAdmin, user: storeUser } = useAuthStore();
+  const navigate = useNavigate(); // Add this line to use navigate
   
-  // Check auth status from both systems
-  const isAuthenticated = appIsAuthenticated || storeIsAuthenticated;
+  // Check auth status from both systems and localStorage
+  const storedToken = localStorage.getItem('eventHub_token');
+  const isAuthenticated = appIsAuthenticated || storeIsAuthenticated || !!storedToken;
   
   // Merge user information, prioritizing store user
-  const user = storeUser || appUser;
+  const storedUserStr = localStorage.getItem('eventHub_user');
+  const storedUser = storedUserStr ? JSON.parse(storedUserStr) : null;
+  const user = storeUser || appUser || storedUser;
   
   // Special check for admin role
   const isAdmin = storeIsAdmin || (user?.role === 'admin');
+  
+  // useEffect to validate token on component mount
+  useEffect(() => {
+    if (storedToken && !user) {
+      // If we have a token but no user, fetch user data
+      userService.getCurrentUser()
+        .then(userData => {
+          useAuthStore.getState().setUser(userData);
+        })
+        .catch(() => {
+          // Token might be invalid, clear localStorage and redirect to login
+          localStorage.removeItem('eventHub_token');
+          localStorage.removeItem('eventHub_user');
+          navigate('/login');
+        });
+    }
+  }, [navigate, user, storedToken]);
   
   // If not authenticated in either system
   if (!isAuthenticated) {
