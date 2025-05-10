@@ -25,7 +25,7 @@ import CloudSpace from "./pages/CloudSpace";
 import ResetPassword from "./components/auth/ResetPassword";
 import PublicEvents from "./pages/PublicEvents";
 import Promotions from "./pages/Promotions";
-
+import SuperAdminSetup from "./components/admin/SuperAdminSetup"
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
@@ -41,6 +41,9 @@ function App() {
             <Toaster position="top-center" />
             <AuthInitializer />
             <Routes>
+              {/* Super Admin Setup Route */}
+              <Route path="/setup-admin" element={<SuperAdminSetup />} />
+              
               {/* Auth Routes - These are the only routes accessible without login */}
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<Navigate to="/login" replace />} />
@@ -153,6 +156,14 @@ function App() {
                 }
               />
               <Route 
+                path="/provider/dashboard/*" 
+                element={
+                  <ProtectedRoute requiredRole="service_provider">
+                    <ProviderDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route 
                 path="/provider/profile-setup" 
                 element={
                   <ProtectedRoute requiredRole="service_provider">
@@ -171,7 +182,7 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              
+              <Route path="/setup-admin" element={<SuperAdminSetup />} />
               {/* Catch all unknown routes and redirect to login */}
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
@@ -229,6 +240,14 @@ function AuthInitializer() {
     }, 30 * 60 * 1000); // 30 minutes
     
     return () => clearInterval(refreshInterval);
+  }, []);
+  
+  useEffect(() => {
+    // Remove any duplicate scripts when the component mounts
+    const duplicateScript = document.getElementById("fido2-page-script-registration");
+    if (duplicateScript) {
+      duplicateScript.remove();
+    }
   }, []);
   
   return isInitialized ? null : (

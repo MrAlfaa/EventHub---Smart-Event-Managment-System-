@@ -29,7 +29,9 @@ async def login(login_data: LoginRequest):
             detail="Incorrect email or password"
         )
     
-    # Create access token
+    print(f"User role: {user['role']}")  # Add debug print
+    
+    # Create access token with the role
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user["_id"]),
@@ -43,7 +45,6 @@ async def login(login_data: LoginRequest):
         user_dict["id"] = str(user_dict["_id"])
         del user_dict["_id"]
     
-    # Make sure you're returning both user and token
     return {"user": user_dict, "token": access_token}
 
 @router.post("/auth/refresh-token", response_model=dict)

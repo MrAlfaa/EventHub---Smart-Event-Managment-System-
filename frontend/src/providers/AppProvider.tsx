@@ -80,7 +80,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const isAuthenticated = storeIsAuthenticated || !!user;
   const isServiceProvider = isAuthenticated && (user?.role === 'service_provider' || storeUser?.role === 'service_provider');
-  const isAdmin = isAuthenticated && (user?.role === 'admin' || storeUser?.role === 'admin');
+  const isAdmin = isAuthenticated && (
+    user?.role === 'admin' || 
+    user?.role === 'super_admin' || 
+    storeUser?.role === 'admin' || 
+    storeUser?.role === 'super_admin'
+  );
 
   // Implement the login method
   const login = (email: string, role: string) => {
