@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
+import axios from "axios";
 import { 
   User, Briefcase, Eye, EyeOff, ArrowLeft, ArrowRight, 
   Mail, Phone, AtSign, Lock, CheckCircle
@@ -80,11 +82,13 @@ const Register = () => {
     }));
   };
 
+  const { register: registerUser, registerServiceProvider } = useAuthStore();
+
   const validateForm = (isProvider: boolean) => {
     const data = isProvider ? providerData : userData;
     
     if (!data.email || !data.password || !data.confirmPassword || 
-        (isProvider && !data.businessName) || (!isProvider && !data.name)) {
+        (isProvider && !providerData.businessName) || (!isProvider && !userData.name)) {
       toast.error("Please fill in all required fields");
       return false;
     }
@@ -102,16 +106,16 @@ const Register = () => {
     return true;
   };
 
-  const handleUserSubmit = (e: React.FormEvent) => {
+  const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm(false)) return;
     
-    // Show terms and conditions dialog for regular users too
+    // Show terms and conditions dialog for regular users
     setShowTerms(true);
   };
 
-  const handleProviderSubmit = (e: React.FormEvent) => {
+  const handleProviderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm(true)) return;
@@ -121,48 +125,61 @@ const Register = () => {
   };
   
   // Handle terms acceptance for both user types
-  const handleTermsAccepted = () => {
-    // Close the terms dialog
-    setShowTerms(false);
-    
-    setIsSubmitting(true);
-    
-    if (activeTab === "service_provider") {
-      // Register the service provider account
-      try {
-        // Simulate API call (in a real app, this would save to the server)
-        setTimeout(() => {
-          toast.success("Basic account created successfully!");
-          
-          // Navigate to the profile setup page with the form data
-          navigate("/provider-approval-setup", {
-            state: {
-              email: providerData.email,
-              username: providerData.username,
-              phone: providerData.phone
-            }
-          });
-        }, 1000);
-      } catch (error) {
+  const handleTermsAccepted = async () => {
+  // Close the terms dialog
+  setShowTerms(false);
+  
+  setIsSubmitting(true);
+  
+  if (activeTab === "service_provider") {
+    // Service provider registration logic (unchanged)
+    try {
+      await registerServiceProvider({
+        name: providerData.businessName,
+        email: providerData.email,
+        phone: providerData.phone,
+        username: providerData.username,
+        password: providerData.password,
+        business_name: providerData.businessName,
+        business_description: "Service provider for events",
+        service_types: [],
+      });
+      
+      toast.success("Service provider account created successfully! Please log in to continue with profile setup.");
+      navigate("/login");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(error.response.data.detail || "Registration failed. Please check your information.");
+      } else {
         toast.error("Registration failed. Please try again.");
-      } finally {
-        setIsSubmitting(false);
       }
-    } else {
-      // Register the regular user account
-      try {
-        // Simulate API call
-        setTimeout(() => {
-          toast.success("Registration successful! Please check your email to verify your account.");
-          navigate("/login");
-        }, 1500);
-      } catch (error) {
-        toast.error("Registration failed. Please try again.");
-      } finally {
-        setIsSubmitting(false);
-      }
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  } else {
+    // Regular user registration logic - updated to use the new API
+    try {
+      await registerUser({
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        username: userData.username,
+        password: userData.password
+      });
+      
+      toast.success("Registration successful! Please log in to continue.");
+      navigate("/login");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(error.response.data.detail || "Registration failed. Please check your information.");
+      } else {
+        toast.error("Registration failed. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+};
 
   return (
     <div className="min-h-screen w-full bg-white p-4 sm:p-6 md:p-8 flex items-center justify-center overflow-hidden relative">

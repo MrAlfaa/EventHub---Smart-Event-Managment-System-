@@ -1,104 +1,87 @@
-# Dependencies
-node_modules/
-vendor/
-.pnp
-.pnp.js
-
-# Python specific
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
-.venv
-pythonenv*
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-.hypothesis/
-pyrightconfig.json
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Environment variables
+# Virtual Environment
+venv/
+env/
+ENV/
+virtualenv/
+
+# Environment variables and sensitive info
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.backup
+.env.development
+.env.test
+.env.production
+*.pem
+credentials.json
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Build directories
-dist/
-build/
-out/
-public/dist/
-
-# Coverage directory
-coverage/
-.nyc_output/
-
-# Database files
-*.sqlite
-*.sqlite3
-*.db
-*.db-shm
-*.db-wal
-
-# IDE and editor files
+# IDE specific files
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-*.sublime-project
-*.sublime-workspace
+.vscode/
 *.swp
 *.swo
 .DS_Store
-Thumbs.db
-
-# Package files
-package-lock.json
-yarn.lock
-*.tgz
-*.zip
-*.tar.gz
-
-# Temp files
-tmp/
-temp/
-.cache/
+*.sublime-workspace
+*.sublime-project
 
 # Testing
 .coverage
-.eslintcache
-/playwright-report/
-/test-results/
+htmlcov/
+.pytest_cache/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
 
-# Miscellaneous
-.npmrc
-.yarnrc
-.node_repl_history
+# MongoDB
+data/db/
+mongod.log
 
-# FastAPI specific
-/uploads/
+# FastAPI
+.fastapi
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Local development
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Alembic migrations (if you're using SQLAlchemy)
+alembic/versions/
+migrations/versions/

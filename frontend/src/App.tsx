@@ -3,6 +3,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "./providers/AppProvider";
 import { ZustandProvider } from "./providers/ZustandProvider";
+import { useEffect } from "react";
+import { useAuthStore } from "./store/useAuthStore";
+import userService from "./services/userService";
 
 // Pages
 import Index from "./pages/Index";
@@ -36,6 +39,7 @@ function App() {
         <AppProvider>
           <TooltipProvider>
             <Toaster position="top-center" />
+            <AuthInitializer />
             <Routes>
               {/* Auth Routes - These are the only routes accessible without login */}
               <Route path="/login" element={<Login />} />
@@ -176,6 +180,33 @@ function App() {
       </BrowserRouter>
     </ZustandProvider>
   );
+}
+
+// New component to handle auth initialization
+function AuthInitializer() {
+  const { setUser } = useAuthStore();
+  
+  useEffect(() => {
+    const token = localStorage.getItem('eventHub_token');
+    
+    // If token exists, try to fetch current user
+    if (token) {
+      const fetchCurrentUser = async () => {
+        try {
+          const userData = await userService.getCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          // Token might be invalid or expired
+          localStorage.removeItem('eventHub_token');
+          localStorage.removeItem('eventHub_user');
+        }
+      };
+      
+      fetchCurrentUser();
+    }
+  }, [setUser]);
+  
+  return null;
 }
 
 export default App;

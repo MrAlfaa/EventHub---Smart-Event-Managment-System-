@@ -27,7 +27,7 @@ const ProviderDashboard = () => {
       return;
     }
     
-    if (user?.role !== "service_provider" && user?.role !== "admin" && user?.role !== "super_admin") {
+    if (user?.role !== "service_provider" && user?.role !== "admin") {
       toast.error("You need a service provider account to access this dashboard");
       navigate("/");
     }

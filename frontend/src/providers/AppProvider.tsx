@@ -1,5 +1,6 @@
 import { EventFilter, ServiceProvider, User } from "@/types";
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface AppContextType {
   user: User | null;
@@ -34,6 +35,10 @@ const defaultFilter: EventFilter = {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
+  // Get auth state from Zustand store
+  const { user: storeUser, isAuthenticated: storeIsAuthenticated } = useAuthStore();
+  
+  // Existing state
   const [user, setUser] = useState<User | null>(null);
   const [cart, setCart] = useState<ServiceProvider[]>([]);
   const [filter, setFilter] = useState<EventFilter>(defaultFilter);
@@ -48,9 +53,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   ]);
   const [autoAcceptBookings, setAutoAcceptBookings] = useState<boolean>(true);
 
-  const isAuthenticated = !!user;
-  const isServiceProvider = isAuthenticated && user?.role === 'service_provider';
-  const isAdmin = isAuthenticated && user?.role === 'admin';
+  // Sync from Zustand store to AppProvider state
+  useEffect(() => {
+    if (storeUser) {
+      setUser(storeUser);
+    }
+  }, [storeUser]);
+
+  const isAuthenticated = storeIsAuthenticated || !!user;
+  const isServiceProvider = isAuthenticated && (user?.role === 'service_provider' || storeUser?.role === 'service_provider');
+  const isAdmin = isAuthenticated && (user?.role === 'admin' || storeUser?.role === 'admin');
 
   // Implement the login method
   const login = (email: string, role: string) => {
@@ -69,6 +81,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Implement the logout method
   const logout = () => {
+    // Call the store's logout method instead of reimplementing
+    useAuthStore.getState().logout();
     setUser(null);
   };
 

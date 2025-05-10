@@ -1,28 +1,24 @@
 from pydantic_settings import BaseSettings
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+from typing import List
 
 class Settings(BaseSettings):
+    # MongoDB settings
+    MONGODB_URL: str
+    
+    # Authentication settings
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    
+    # CORS
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    
     # API settings
     API_V1_STR: str = "/api"
-    PROJECT_NAME: str = "Event Organizing Platform API"
     
-    # MongoDB settings
-    MONGODB_URL: str = os.getenv("MONGODB_URL")
-    MONGODB_NAME: str = os.getenv("MONGODB_NAME", "event_platform_db")
-    
-    # JWT settings
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
-    
-    # File upload settings
-    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
-
     class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
 
 settings = Settings()
