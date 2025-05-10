@@ -134,8 +134,8 @@ const authService = {
       if (value instanceof File) {
         formData.append(key, value);
       } else if (Array.isArray(value)) {
-        // For arrays like serviceLocations, serviceTypes, etc.
-        value.forEach(item => formData.append(`${key}[]`, item));
+        // For arrays like serviceLocations, coveredEventTypes
+        value.forEach(item => formData.append(key, item));
       } else if (value !== null && value !== undefined) {
         formData.append(key, String(value));
       }

@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     # API settings
     API_V1_STR: str = "/api"
     
+    # Cloudinary settings
+    CLOUDINARY_CLOUD_NAME: str
+    CLOUDINARY_API_KEY: str
+    CLOUDINARY_API_SECRET: str
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

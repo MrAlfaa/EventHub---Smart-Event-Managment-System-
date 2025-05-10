@@ -156,7 +156,8 @@ const Register = () => {
           initialData: {
             email: providerData.email,
             username: providerData.username,
-            phone: providerData.phone
+            phone: providerData.phone,
+            businessName: providerData.businessName
           }
         }
       });

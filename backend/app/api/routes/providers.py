@@ -3,7 +3,17 @@ from typing import List
 from app.models.user import ServiceProviderProfile, ServiceProviderCreate
 from app.db.mongodb import get_database
 from datetime import datetime
-from app.core.security import get_password_hash  # Add this import
+from app.core.security import get_password_hash
+import cloudinary
+import cloudinary.uploader
+from app.core.config import settings
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET
+)
 
 router = APIRouter()
 
@@ -81,18 +91,59 @@ async def complete_service_provider_profile(
             detail="User not found"
         )
     
-    # In a real implementation, you would:
-    # 1. Upload files to a storage service (like AWS S3, Cloudinary, etc.)
-    # 2. Get the URLs for the uploaded files
-    # 3. Save the profile data to the database
-
-    # For now, let's create a mock implementation
+    # Upload images to Cloudinary
+    nic_front_image_url = None
+    nic_back_image_url = None
+    profile_picture_url = None
+    cover_photo_url = None
+    
+    try:
+        # Upload NIC front image
+        nic_front_result = cloudinary.uploader.upload(
+            nicFrontImage.file,
+            folder="eventhub/nic_images",
+            public_id=f"nic_front_{username}_{datetime.now().timestamp()}"
+        )
+        nic_front_image_url = nic_front_result["secure_url"]
+        
+        # Upload NIC back image
+        nic_back_result = cloudinary.uploader.upload(
+            nicBackImage.file,
+            folder="eventhub/nic_images",
+            public_id=f"nic_back_{username}_{datetime.now().timestamp()}"
+        )
+        nic_back_image_url = nic_back_result["secure_url"]
+        
+        # Upload profile picture
+        profile_picture_result = cloudinary.uploader.upload(
+            profilePicture.file,
+            folder="eventhub/profile_pictures",
+            public_id=f"profile_{username}_{datetime.now().timestamp()}"
+        )
+        profile_picture_url = profile_picture_result["secure_url"]
+        
+        # Upload cover photo if provided
+        if coverPhoto:
+            cover_photo_result = cloudinary.uploader.upload(
+                coverPhoto.file,
+                folder="eventhub/cover_photos",
+                public_id=f"cover_{username}_{datetime.now().timestamp()}"
+            )
+            cover_photo_url = cover_photo_result["secure_url"]
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading images: {str(e)}"
+        )
+    
+    # Create profile data
     profile_data = {
         "user_id": str(user["_id"]),
         "provider_name": providerName,
         "nic_number": nicNumber,
-        "nic_front_image_url": "mock_url_for_front_image",  # In real app, this would be the upload URL
-        "nic_back_image_url": "mock_url_for_back_image",    # In real app, this would be the upload URL
+        "nic_front_image_url": nic_front_image_url,
+        "nic_back_image_url": nic_back_image_url,
         "business_name": businessName,
         "business_registration_number": businessRegistrationNumber,
         "business_description": businessDescription,
@@ -104,8 +155,8 @@ async def complete_service_provider_profile(
         "service_locations": serviceLocations,
         "service_types": serviceTypes,
         "covered_event_types": coveredEventTypes,
-        "profile_picture_url": "mock_url_for_profile_picture",  # In real app, this would be the upload URL
-        "cover_photo_url": "mock_url_for_cover_photo" if coverPhoto else None,  # In real app, this would be the upload URL
+        "profile_picture_url": profile_picture_url,
+        "cover_photo_url": cover_photo_url,
         "slogan": slogan,
         "bank_name": bankName,
         "branch_name": branchName,

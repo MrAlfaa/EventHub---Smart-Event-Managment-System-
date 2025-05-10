@@ -154,7 +154,7 @@ export function ServiceProviderApprovalForm({
     nicFrontImage: null,
     nicBackImage: null,
     
-    businessName: "",
+    businessName: formInitialData.businessName || "",  // Pre-fill business name
     businessRegistrationNumber: "",
     businessDescription: "", // Initialize business description
     
@@ -1102,7 +1102,7 @@ export function ServiceProviderApprovalForm({
                 <Label htmlFor="cardNumber">Card Number <span className="text-red-500">*</span></Label>
                 <Input 
                   id="cardNumber" 
-                  placeholder="4242 4242 4242 4242" 
+                  placeholder="4242 4242 4242" 
                   value={formData.cardNumber}
                   onChange={handleInputChange}
                   required

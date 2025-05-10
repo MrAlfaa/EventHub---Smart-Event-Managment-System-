@@ -214,7 +214,8 @@ function ServiceProviderApprovalFormWrapper() {
   const initialData = location.state?.initialData || {
     email: "",
     username: "",
-    phone: ""
+    phone: "",
+    businessName: ""
   };
   
   // If no initialData email was provided, redirect to registration
@@ -227,10 +228,10 @@ function ServiceProviderApprovalFormWrapper() {
   // Handle form submission
   const handleSubmit = async (data: any) => {
     try {
-      // Here you would call an API to submit the complete provider profile
+      // Call the API to submit the complete provider profile
       await registerServiceProviderProfile(data);
       toast.success("Your profile has been submitted for approval!");
-      navigate("/login");
+      navigate("/login"); // Redirect to login page after successful submission
     } catch (error) {
       toast.error("There was an error submitting your profile. Please try again.");
     }
