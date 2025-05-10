@@ -15,18 +15,27 @@ import AdminNotifications from "@/components/admin/AdminNotifications";
 import { toast } from "sonner";
 
 const AdminDashboard = () => {
-  const { isAuthenticated, isAdmin } = useAuthStore();
+  const { isAuthenticated, isAdmin, user } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log("AdminDashboard: Authentication check");
+    console.log("AdminDashboard: isAuthenticated:", isAuthenticated);
+    console.log("AdminDashboard: isAdmin:", isAdmin);
+    console.log("AdminDashboard: User:", user);
+    
     if (!isAuthenticated) {
+      console.log("AdminDashboard: Not authenticated, redirecting to login");
       toast.error("Please login to access the admin dashboard");
       navigate("/admin/login");
     } else if (!isAdmin) {
+      console.log("AdminDashboard: Not admin, redirecting");
       toast.error("You don't have permission to access the admin dashboard");
       navigate("/");
+    } else {
+      console.log("AdminDashboard: Access granted");
     }
-  }, [isAuthenticated, isAdmin, navigate]);
+  }, [isAuthenticated, isAdmin, navigate, user]);
 
   if (!isAuthenticated || !isAdmin) {
     return null;

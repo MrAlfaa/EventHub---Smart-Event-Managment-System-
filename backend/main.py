@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import auth, users, providers
+from app.api.routes import auth, users, providers, admin
 from app.core.config import settings
 from app.core.events import create_start_app_handler, create_stop_app_handler
 
@@ -27,6 +27,7 @@ app.add_event_handler("shutdown", create_stop_app_handler(app))
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(users.router, prefix="/api", tags=["Users"])
 app.include_router(providers.router, prefix="/api", tags=["Service Providers"])
+app.include_router(admin.router, prefix="/api", tags=["Admin"])
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():

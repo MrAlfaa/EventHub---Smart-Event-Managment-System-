@@ -40,11 +40,12 @@ export function Navbar() {
     navigate("/");
   };
 
+  // Update the getUserProfilePath function to handle super_admin role
   const getUserProfilePath = () => {
     if (user?.role === 'service_provider') {
       // Always redirect service providers to their dashboard
       return '/provider/dashboard';
-    } else if (user?.role === 'admin') {
+    } else if (user?.role === 'admin' || user?.role === 'super_admin') {
       // Redirect admin users to admin dashboard
       return '/admin/dashboard';
     } else {

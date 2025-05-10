@@ -53,6 +53,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   ]);
   const [autoAcceptBookings, setAutoAcceptBookings] = useState<boolean>(true);
 
+  // Add this useEffect to check localStorage on initial load
+  useEffect(() => {
+    // Try to get authentication data from localStorage on initial load
+    const storedToken = localStorage.getItem('eventHub_token');
+    const storedUser = localStorage.getItem('eventHub_user');
+    
+    if (storedToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser) as User;
+        setUser(parsedUser);
+      } catch (error) {
+        // If parsing fails, clear localStorage
+        localStorage.removeItem('eventHub_token');
+        localStorage.removeItem('eventHub_user');
+      }
+    }
+  }, []);
+
   // Sync from Zustand store to AppProvider state
   useEffect(() => {
     if (storeUser) {
@@ -62,7 +80,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const isAuthenticated = storeIsAuthenticated || !!user;
   const isServiceProvider = isAuthenticated && (user?.role === 'service_provider' || storeUser?.role === 'service_provider');
-  const isAdmin = isAuthenticated && (user?.role === 'admin' || storeUser?.role === 'admin');
+  const isAdmin = isAuthenticated && (
+    user?.role === 'admin' || 
+    user?.role === 'super_admin' || 
+    storeUser?.role === 'admin' || 
+    storeUser?.role === 'super_admin'
+  );
 
   // Implement the login method
   const login = (email: string, role: string) => {
