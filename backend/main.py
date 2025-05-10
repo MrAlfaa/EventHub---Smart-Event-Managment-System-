@@ -1,14 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import auth, users, providers, admin
 from app.core.config import settings
-from app.core.events import create_start_app_handler, create_stop_app_handler
+from app.db.mongodb import connect_to_mongo, close_mongo_connection
+from app.api.routes import auth, users, providers, admin
 
-app = FastAPI(
-    title="EventHub API",
-    description="API for EventHub - Smart Event Management System",
-    version="1.0.0"
-)
+app = FastAPI()
 
 # Configure CORS
 app.add_middleware(
@@ -19,20 +15,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set up event handlers
-app.add_event_handler("startup", create_start_app_handler(app))
-app.add_event_handler("shutdown", create_stop_app_handler(app))
+# Database connection events
+@app.on_event("startup")
+async def startup_db_client():
+    await connect_to_mongo()
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    await close_mongo_connection()
 
 # Include API routes
-app.include_router(auth.router, prefix="/api", tags=["Authentication"])
-app.include_router(users.router, prefix="/api", tags=["Users"])
-app.include_router(providers.router, prefix="/api", tags=["Service Providers"])
-app.include_router(admin.router, prefix="/api", tags=["Admin"])
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(users.router, prefix=settings.API_V1_STR)
+app.include_router(providers.router, prefix=settings.API_V1_STR)
+app.include_router(admin.router, prefix=settings.API_V1_STR)
 
-@app.get("/api/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/")
+async def root():
+    return {"message": "Welcome to EventHub API"}

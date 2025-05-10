@@ -29,6 +29,40 @@ export interface RegisterServiceProviderData {
   service_types: string[];
 }
 
+// Define the interface for service provider profile data
+export interface ServiceProviderProfileData {
+  providerName: string;
+  nicNumber: string;
+  nicFrontImage: File;
+  nicBackImage: File;
+  businessName: string;
+  businessRegistrationNumber?: string;
+  businessDescription?: string;
+  username: string;
+  email: string;
+  phone: string;
+  contactEmail: string;
+  contactPhone: string;
+  cardName: string;
+  cardNumber: string;
+  cardExpiry: string;
+  cardCvv: string;
+  address: string;
+  city: string;
+  province: string;
+  serviceLocations: string[];
+  serviceTypes: string | string[];
+  coveredEventTypes: string[];
+  profilePicture: File;
+  coverPhoto?: File;
+  slogan?: string;
+  bankName: string;
+  branchName: string;
+  accountNumber: string;
+  accountOwnerName: string;
+  [key: string]: any; // To allow for any other fields
+}
+
 // Create an axios instance for authentication
 const authApi = axios.create({
   baseURL: API_URL,
@@ -87,6 +121,32 @@ const authService = {
   // Get current user profile
   getCurrentUser: async (): Promise<User> => {
     const response = await authApi.get('/users/me');
+    return response.data;
+  },
+
+  // Register service provider profile with complete data
+  registerServiceProviderProfile: async (profileData: ServiceProviderProfileData): Promise<void> => {
+    // Create FormData for file uploads
+    const formData = new FormData();
+    
+    // Add all form fields to FormData
+    Object.entries(profileData).forEach(([key, value]) => {
+      if (value instanceof File) {
+        formData.append(key, value);
+      } else if (Array.isArray(value)) {
+        // For arrays like serviceLocations, serviceTypes, etc.
+        value.forEach(item => formData.append(`${key}[]`, item));
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    
+    const response = await authApi.post('/providers/complete-profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
     return response.data;
   },
 };

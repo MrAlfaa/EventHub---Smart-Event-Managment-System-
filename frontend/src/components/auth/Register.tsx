@@ -122,6 +122,9 @@ const Register = () => {
     
     // Show terms and conditions dialog
     setShowTerms(true);
+    
+    // Note: The actual registration will happen in handleTermsAccepted
+    // after the user accepts the terms and conditions
   };
   
   // Handle terms acceptance for both user types
@@ -133,7 +136,8 @@ const Register = () => {
   
   if (activeTab === "service_provider") {
     try {
-      await registerServiceProvider({
+      // Call the registration API
+      const result = await registerServiceProvider({
         name: providerData.businessName,
         email: providerData.email,
         phone: providerData.phone,
@@ -144,9 +148,18 @@ const Register = () => {
         service_types: [],
       });
       
-      toast.success("Service provider account created successfully! Please log in to continue with profile setup.");
-      // Explicitly navigate to login with a query parameter
-      navigate("/login?type=provider");
+      toast.success("Service provider account created successfully! Please complete your profile setup.");
+      
+      // After successful registration, navigate to the approval form with initial data
+      navigate("/provider-approval-form", { 
+        state: { 
+          initialData: {
+            email: providerData.email,
+            username: providerData.username,
+            phone: providerData.phone
+          }
+        }
+      });
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         toast.error(error.response.data.detail || "Registration failed. Please check your information.");
@@ -157,7 +170,7 @@ const Register = () => {
       setIsSubmitting(false);
     }
   } else {
-    // Regular user registration logic - updated to use the new API
+    // Regular user registration logic - unchanged
     try {
       await registerUser({
         name: userData.name,

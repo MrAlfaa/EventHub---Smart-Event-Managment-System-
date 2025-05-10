@@ -22,7 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X, User, Building, CreditCard, MapPin, ListChecks, Image, Mail, Phone, Lock, FileText, AlertCircle, ArrowLeft, Globe, ChevronDown, Check, CalendarRange } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Available service types for selection
 const serviceTypes = [
@@ -143,6 +143,10 @@ export function ServiceProviderApprovalForm({
   onSubmit 
 }: ServiceProviderApprovalFormProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Use location state if available
+  const formInitialData = location.state?.initialData || initialData;
   
   const [formData, setFormData] = useState<ServiceProviderApprovalFormData>({
     providerName: "",
@@ -154,12 +158,12 @@ export function ServiceProviderApprovalForm({
     businessRegistrationNumber: "",
     businessDescription: "", // Initialize business description
     
-    username: initialData.username || "",
-    email: initialData.email || "",
-    phone: initialData.phone || "", // Initialize with phone from initialData
+    username: formInitialData.username || "",
+    email: formInitialData.email || "",
+    phone: formInitialData.phone || "", // Initialize with phone from initialData
     
-    contactEmail: "", // No longer pre-filled from account info
-    contactPhone: "", // No longer pre-filled from account info
+    contactEmail: formInitialData.email || "", // Pre-fill with registration email
+    contactPhone: formInitialData.phone || "", // Pre-fill with registration phone
     
     cardName: "",
     cardNumber: "",

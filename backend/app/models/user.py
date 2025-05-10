@@ -95,3 +95,39 @@ class ServiceProviderInDB(UserInDB):
         "arbitrary_types_allowed": True,
         "json_encoders": {ObjectId: str}
     }
+
+# Service Provider Profile model
+class ServiceProviderProfile(BaseModel):
+    user_id: str
+    provider_name: str
+    nic_number: str
+    nic_front_image_url: str
+    nic_back_image_url: str
+    business_name: str
+    business_registration_number: Optional[str] = None
+    business_description: Optional[str] = None
+    contact_email: str
+    contact_phone: str
+    address: str
+    city: str
+    province: str
+    service_locations: List[str]
+    service_types: str
+    covered_event_types: List[str]
+    profile_picture_url: str
+    cover_photo_url: Optional[str] = None
+    slogan: Optional[str] = None
+    bank_name: str
+    branch_name: str
+    account_number: str
+    account_owner_name: str
+    approval_status: str = "pending"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Replace class Config with model_config
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "json_encoders": {ObjectId: str}
+    }

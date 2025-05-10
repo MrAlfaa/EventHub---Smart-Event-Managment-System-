@@ -1,9 +1,9 @@
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppProvider } from "./providers/AppProvider";
 import { ZustandProvider } from "./providers/ZustandProvider";
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "./store/useAuthStore";
 import userService from "./services/userService";
 
@@ -26,6 +26,8 @@ import ResetPassword from "./components/auth/ResetPassword";
 import PublicEvents from "./pages/PublicEvents";
 import Promotions from "./pages/Promotions";
 import SuperAdminSetup from "./components/admin/SuperAdminSetup"
+import { ServiceProviderApprovalForm } from "./components/auth/ServiceProviderApprovalForm";
+
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
@@ -53,6 +55,12 @@ function App() {
               
               {/* Root path redirects to login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
+              
+              {/* Update the service provider approval form route to access location state */}
+              <Route 
+                path="/provider-approval-form" 
+                element={<ServiceProviderApprovalFormWrapper />}
+              />
               
               {/* Protected Public Routes - require any authenticated user */}
               <Route 
@@ -171,7 +179,10 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              
+              <Route 
+                path="/provider-approval-form" 
+                element={<ServiceProviderApprovalFormWrapper />} 
+              />
               {/* Admin Routes */}
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
               <Route 
@@ -190,6 +201,46 @@ function App() {
         </AppProvider>
       </BrowserRouter>
     </ZustandProvider>
+  );
+}
+
+// New component to handle service provider approval form with location state
+function ServiceProviderApprovalFormWrapper() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { registerServiceProviderProfile } = useAuthStore();
+  
+  // Extract initialData from location state
+  const initialData = location.state?.initialData || {
+    email: "",
+    username: "",
+    phone: ""
+  };
+  
+  // If no initialData email was provided, redirect to registration
+  useEffect(() => {
+    if (!location.state?.initialData?.email) {
+      navigate('/register?type=provider');
+    }
+  }, [location.state, navigate]);
+  
+  // Handle form submission
+  const handleSubmit = async (data: any) => {
+    try {
+      // Here you would call an API to submit the complete provider profile
+      await registerServiceProviderProfile(data);
+      toast.success("Your profile has been submitted for approval!");
+      navigate("/login");
+    } catch (error) {
+      toast.error("There was an error submitting your profile. Please try again.");
+    }
+  };
+  
+  return (
+    <ServiceProviderApprovalForm 
+      initialData={initialData} 
+      onSubmit={handleSubmit} 
+    />
   );
 }
 
