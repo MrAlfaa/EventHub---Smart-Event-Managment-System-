@@ -41,14 +41,21 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [unreadNotifications] = useState(3); // This would come from a real notification system
 
   const handleLogout = () => {
-    zustandLogout(); // Logout from Zustand store
-    appLogout(); // Logout from AppProvider context
+    // First clear all auth state from Zustand store
+    zustandLogout(); 
+    
+    // Also clear from AppProvider context for double security
+    appLogout(); 
+    
+    // Clear localStorage explicitly
+    localStorage.removeItem('eventHub_token');
+    localStorage.removeItem('eventHub_user');
+    
+    // Show success message
     toast.success("Logged out successfully");
-    navigate("/");
-  };
-
-  const visitHomePage = () => {
-    navigate("/home");
+    
+    // Navigate to login page
+    navigate("/login");
   };
 
   const isActive = (path: string) => {
@@ -112,14 +119,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </SidebarContent>
           
           <SidebarFooter>
-            <Button 
-              variant="outline" 
-              className="flex w-full items-center justify-start gap-2 mb-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200" 
-              onClick={visitHomePage}
-            >
-              <Home size={16} />
-              <span>Visit Website Home</span>
-            </Button>
             <Button 
               variant="outline" 
               className="flex w-full items-center justify-start gap-2" 

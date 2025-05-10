@@ -69,10 +69,27 @@
     },
   
     logout: () => {
+      // Call the auth service logout
       authService.logout();
+      
+      // Ensure all local storage is cleared
       localStorage.removeItem('eventHub_token');
       localStorage.removeItem('eventHub_user');
-      set({ user: null, isAuthenticated: false, isAdmin: false, isSuperAdmin: false });
+      
+      // Any other auth-related items in localStorage
+      // Clear all session data
+      sessionStorage.clear();
+      
+      // Reset the store state
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        isAdmin: false, 
+        isSuperAdmin: false,
+        error: null
+      });
+      
+      console.log("AuthStore: User logged out and state reset");
     },
   
     setUser: (user) => {

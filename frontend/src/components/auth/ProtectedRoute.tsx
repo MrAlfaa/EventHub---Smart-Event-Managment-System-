@@ -77,13 +77,16 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       console.log("ProtectedRoute: Admin access denied");
       toast.error("You don't have permission to access the admin area");
       
-      // Redirect to the appropriate dashboard based on user role
+      // Redirect based on actual role
       if (isServiceProvider) {
-        console.log("ProtectedRoute: Redirecting to provider dashboard");
+        console.log("ProtectedRoute: Redirecting admin request to provider dashboard");
         return <Navigate to="/provider/dashboard" replace />;
-      } else {
-        console.log("ProtectedRoute: Redirecting to home");
+      } else if (user?.role === 'user') {
+        console.log("ProtectedRoute: Redirecting admin request to user home");
         return <Navigate to="/home" replace />;
+      } else {
+        // If not authenticated or role not recognized
+        return <Navigate to="/login" replace />;
       }
     }
     console.log("ProtectedRoute: Admin access granted");

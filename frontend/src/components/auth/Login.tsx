@@ -69,31 +69,32 @@ const Login = () => {
     try {
       console.log("Login attempt with:", credentials.email);
       const response = await login(credentials);
-      console.log("Login response:", response);
-      console.log("User role:", response.user.role);
+      console.log("Login response received, user role:", response.user.role);
       
       // Store user data in localStorage for persistence
       localStorage.setItem('eventHub_user', JSON.stringify(response.user));
       
-      if (response.user.role === 'admin' || response.user.role === 'super_admin') {
-        console.log("Admin login detected, navigating to admin dashboard");
-        toast.success("Admin login successful");
-        // Use a short timeout to ensure state is updated before navigation
-        setTimeout(() => {
+      // Handle navigation based on role
+      switch(response.user.role) {
+        case 'super_admin':
+          console.log("Super admin login detected, navigating to admin dashboard");
+          toast.success("Super Admin login successful");
           navigate('/admin/dashboard');
-        }, 100);
-      } else if (response.user.role === 'service_provider') {
-        console.log("Service provider login detected, navigating to provider dashboard");
-        toast.success("Service provider login successful");
-        setTimeout(() => {
+          break;
+        case 'admin':
+          console.log("Admin login detected, navigating to admin dashboard");
+          toast.success("Admin login successful");
+          navigate('/admin/dashboard');
+          break;
+        case 'service_provider':
+          console.log("Service provider login detected, navigating to provider dashboard");
+          toast.success("Service provider login successful");
           navigate('/provider/dashboard');
-        }, 100);
-      } else {
-        console.log("Regular user login detected, navigating to home");
-        toast.success("Login successful");
-        setTimeout(() => {
+          break;
+        default:
+          console.log("Regular user login detected, navigating to home");
+          toast.success("Login successful");
           navigate('/home');
-        }, 100);
       }
     } catch (error: any) {
       console.error("Login error:", error);
