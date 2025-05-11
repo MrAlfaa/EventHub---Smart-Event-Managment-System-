@@ -32,4 +32,25 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
             detail="User not found"
         )
     
-    return UserInDB(**user)
+    # Convert _id to string before passing to model
+    if '_id' in user:
+        user['id'] = str(user['_id'])
+        # Don't delete '_id' here as it might be needed elsewhere
+    
+    try:
+        return UserInDB(**user)
+    except Exception as e:
+        print(f"Error creating UserInDB: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+# Add this new function to check for admin privileges
+async def get_current_admin_user(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
+    if current_user.role not in ["admin", "super_admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough permission"
+        )
+    return current_user

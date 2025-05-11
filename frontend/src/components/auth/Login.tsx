@@ -98,7 +98,18 @@ const Login = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error(error.response?.data?.detail || "Invalid credentials");
+      // Handle specific error cases
+      if (error.response?.status === 403) {
+        if (error.response?.data?.detail === "Your account is pending approval") {
+          toast.error("Your service provider account is pending approval. Please check back later.");
+        } else if (error.response?.data?.detail === "Your account application has been rejected") {
+          toast.error("Your service provider application has been rejected. Please contact support for more information.");
+        } else {
+          toast.error(error.response?.data?.detail || "Access denied");
+        }
+      } else {
+        toast.error(error.response?.data?.detail || "Invalid credentials");
+      }
     } finally {
       setIsLoading(false);
     }

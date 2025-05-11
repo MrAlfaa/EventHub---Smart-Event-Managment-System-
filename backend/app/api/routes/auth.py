@@ -29,7 +29,19 @@ async def login(login_data: LoginRequest):
             detail="Incorrect email or password"
         )
     
-    print(f"User role: {user['role']}")  # Add debug print
+    # Check if service provider is approved
+    if user["role"] == "service_provider":
+        approval_status = user.get("approval_status", "pending")
+        if approval_status == "pending":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is pending approval"
+            )
+        elif approval_status == "rejected":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account application has been rejected"
+            )
     
     # Create access token with the role
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
