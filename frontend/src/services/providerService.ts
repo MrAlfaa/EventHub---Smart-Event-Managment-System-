@@ -50,6 +50,42 @@ const providerService = {
   deleteGalleryImage: async (imageUrl: string): Promise<void> => {
     // Using query parameter instead of request body for DELETE
     await providerApi.delete(`/providers/gallery/image?imageUrl=${encodeURIComponent(imageUrl)}`);
+  },
+
+  // Get provider profile
+  getProviderProfile: async () => {
+    const response = await providerApi.get('/providers/me');
+    return response.data;
+  },
+
+  // Update provider profile
+  updateProviderProfile: async (profileData: any) => {
+    const response = await providerApi.put('/providers/me', profileData);
+    return response.data;
+  },
+
+  // Get provider payment cards
+  getProviderCards: async () => {
+    const response = await providerApi.get('/providers/cards');
+    return response.data;
+  },
+
+  // Add new payment card
+  addProviderCard: async (cardData: any) => {
+    const response = await providerApi.post('/providers/cards', cardData);
+    return response.data;
+  },
+
+  // Update payment card
+  updateProviderCard: async (cardId: string, cardData: any) => {
+    const response = await providerApi.put(`/providers/cards/${cardId}`, cardData);
+    return response.data;
+  },
+
+  // Delete payment card
+  deleteProviderCard: async (cardId: string) => {
+    const response = await providerApi.delete(`/providers/cards/${cardId}`);
+    return response.data;
   }
 };
 

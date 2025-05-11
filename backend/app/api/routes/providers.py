@@ -252,6 +252,7 @@ async def get_gallery_images(current_user: UserInDB = Depends(get_current_user))
     return {"images": []}
 
 @router.delete("/providers/gallery/image", response_model=dict)
+@router.delete("/providers/gallery/image", response_model=dict)
 async def delete_gallery_image(
     imageUrl: str,
     current_user: UserInDB = Depends(get_current_user)
@@ -303,3 +304,270 @@ async def delete_gallery_image(
         print(f"Error deleting image from Cloudinary: {str(e)}")
     
     return {"message": "Image deleted successfully"}
+
+
+@router.get("/providers/me", response_model=dict)
+async def get_provider_profile(current_user: UserInDB = Depends(get_current_user)):
+    """Get current service provider profile"""
+    # Verify user is a service provider
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their profile"
+        )
+    
+    db = await get_database()
+    
+    # Get provider data
+    provider_profile = await db.service_provider_profiles.find_one({"user_id": str(current_user.id)})
+    if not provider_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Provider profile not found"
+        )
+    
+    # Convert ObjectId to string
+    if "_id" in provider_profile:
+        provider_profile["id"] = str(provider_profile["_id"])
+        del provider_profile["_id"]
+    
+    return provider_profile
+
+@router.put("/providers/me", response_model=dict)
+@router.put("/providers/me", response_model=dict)
+async def update_provider_profile(
+    profile_data: dict,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Update service provider profile"""
+    # Verify user is a service provider
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can update their profile"
+        )
+    
+    db = await get_database()
+    
+    # Make sure the profile exists
+    existing_profile = await db.service_provider_profiles.find_one({"user_id": str(current_user.id)})
+    if not existing_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Provider profile not found"
+        )
+    
+    # Prepare update data
+    update_data = {k: v for k, v in profile_data.items() if k not in ["user_id", "created_at", "approval_status", "nic_number"]}
+    update_data["updated_at"] = datetime.utcnow()
+    
+    # Update profile
+    result = await db.service_provider_profiles.update_one(
+        {"user_id": str(current_user.id)},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No changes made to profile"
+        )
+    
+    # Get updated profile
+    updated_profile = await db.service_provider_profiles.find_one({"user_id": str(current_user.id)})
+    
+    # Convert ObjectId to string
+    if "_id" in updated_profile:
+        updated_profile["id"] = str(updated_profile["_id"])
+        del updated_profile["_id"]
+    
+    return updated_profile
+
+
+@router.get("/providers/cards", response_model=list)
+async def get_provider_cards(current_user: UserInDB = Depends(get_current_user)):
+    """Get service provider payment cards"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their cards"
+        )
+    
+    db = await get_database()
+    
+    # Get provider cards
+    cards = await db.provider_cards.find({"user_id": str(current_user.id)}).to_list(length=100)
+    
+    # Convert ObjectId to string for each card
+    for card in cards:
+        if "_id" in card:
+            card["id"] = str(card["_id"])
+            del card["_id"]
+    
+    return cards
+
+
+@router.post("/providers/cards", response_model=dict)
+async def add_provider_card(
+    card_data: dict,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Add a new payment card for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can add cards"
+        )
+    
+    db = await get_database()
+    
+    # Check if card limit reached (max 3 cards)
+    card_count = await db.provider_cards.count_documents({"user_id": str(current_user.id)})
+    if card_count >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum card limit reached (3)"
+        )
+    
+    # Prepare card data
+    new_card = {
+        "user_id": str(current_user.id),
+        "cardholderName": card_data["cardholderName"],
+        "cardNumber": card_data["cardNumber"],
+        "expiryMonth": card_data["expiryMonth"],
+        "expiryYear": card_data["expiryYear"],
+        "cvv": card_data["cvv"],
+        "cardType": card_data["cardType"],
+        "isDefault": card_data.get("isDefault", False),
+        "created_at": datetime.utcnow()
+    }
+    
+    # If this is the first card or set as default, update all other cards to non-default
+    if new_card["isDefault"] or card_count == 0:
+        await db.provider_cards.update_many(
+            {"user_id": str(current_user.id)},
+            {"$set": {"isDefault": False}}
+        )
+        new_card["isDefault"] = True
+    
+    # Insert card
+    result = await db.provider_cards.insert_one(new_card)
+    
+    # Get new card with ID
+    new_card["id"] = str(result.inserted_id)
+    
+    return new_card
+
+
+@router.put("/providers/cards/{card_id}", response_model=dict)
+async def update_provider_card(
+    card_id: str,
+    card_data: dict,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Update a payment card for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can update their cards"
+        )
+    
+    db = await get_database()
+    
+    # Make sure the card exists and belongs to this user
+    existing_card = await db.provider_cards.find_one({
+        "_id": ObjectId(card_id),
+        "user_id": str(current_user.id)
+    })
+    
+    if not existing_card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card not found"
+        )
+    
+    # Prepare update data
+    update_data = {
+        "cardholderName": card_data["cardholderName"],
+        "cardNumber": card_data["cardNumber"],
+        "expiryMonth": card_data["expiryMonth"],
+        "expiryYear": card_data["expiryYear"],
+        "cvv": card_data["cvv"],
+        "cardType": card_data["cardType"],
+        "isDefault": card_data.get("isDefault", False)
+    }
+    
+    # If setting as default, update all other cards to non-default
+    if update_data["isDefault"] and not existing_card.get("isDefault", False):
+        await db.provider_cards.update_many(
+            {"user_id": str(current_user.id), "_id": {"$ne": ObjectId(card_id)}},
+            {"$set": {"isDefault": False}}
+        )
+    
+    # Update card
+    result = await db.provider_cards.update_one(
+        {"_id": ObjectId(card_id), "user_id": str(current_user.id)},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No changes made to card"
+        )
+    
+    # Get updated card
+    updated_card = await db.provider_cards.find_one({"_id": ObjectId(card_id)})
+    updated_card["id"] = str(updated_card["_id"])
+    del updated_card["_id"]
+    
+    return updated_card
+
+
+@router.delete("/providers/cards/{card_id}", response_model=dict)
+async def delete_provider_card(
+    card_id: str,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Delete a payment card for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can delete their cards"
+        )
+    
+    db = await get_database()
+    
+    # Make sure the card exists and belongs to this user
+    existing_card = await db.provider_cards.find_one({
+        "_id": ObjectId(card_id),
+        "user_id": str(current_user.id)
+    })
+    
+    if not existing_card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card not found"
+        )
+    
+    # Check if it's the only card
+    card_count = await db.provider_cards.count_documents({"user_id": str(current_user.id)})
+    if card_count <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the only card"
+        )
+    
+    # Delete card
+    await db.provider_cards.delete_one({"_id": ObjectId(card_id)})
+    
+    # If deleted card was default, set another card as default
+    if existing_card.get("isDefault", False):
+        another_card = await db.provider_cards.find_one({"user_id": str(current_user.id)})
+        if another_card:
+            await db.provider_cards.update_one(
+                {"_id": another_card["_id"]},
+                {"$set": {"isDefault": True}}
+            )
+    
+    return {"message": "Card deleted successfully"}
