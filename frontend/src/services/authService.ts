@@ -51,7 +51,7 @@ export interface ServiceProviderProfileData {
   city: string;
   province: string;
   serviceLocations: string[];
-  serviceTypes: string | string[];
+  serviceTypes: string;
   coveredEventTypes: string[];
   profilePicture: File;
   coverPhoto?: File;

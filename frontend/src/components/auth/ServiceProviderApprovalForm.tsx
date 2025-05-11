@@ -24,6 +24,7 @@ import { X, User, Building, CreditCard, MapPin, ListChecks, Image, Mail, Phone, 
 import { cn } from "@/lib/utils";
 import { useNavigate, useLocation } from "react-router-dom";
 
+
 // Available service types for selection
 const serviceTypes = [
   { label: "Hotel", value: "hotel" },
@@ -60,8 +61,20 @@ const eventTypes = [
   { label: "Other", value: "other" }
 ];
 
-// Define major cities in Sri Lanka
-const SRI_LANKA_CITIES = {
+// Add this type definition at the top of the file, before the SRI_LANKA_CITIES constant
+type SriLankaProvince = 
+  | "Western"
+  | "Central" 
+  | "Southern" 
+  | "Northern" 
+  | "Eastern" 
+  | "North Western" 
+  | "North Central" 
+  | "Uva" 
+  | "Sabaragamuwa";
+
+// Then modify the SRI_LANKA_CITIES declaration to use this type
+const SRI_LANKA_CITIES: Record<SriLankaProvince, string[]> = {
   "Western": ["Colombo", "Negombo", "Kalutara", "Gampaha", "Moratuwa", "Panadura"],
   "Central": ["Kandy", "Matale", "Nuwara Eliya", "Dambulla", "Gampola"],
   "Southern": ["Galle", "Matara", "Hambantota", "Tangalle", "Ambalangoda"],
@@ -86,7 +99,7 @@ interface ServiceProviderApprovalFormData {
   // Business info
   businessName: string;
   businessRegistrationNumber?: string;
-  businessDescription?: string; // Made business description optional
+  businessDescription?: string;
   
   // Account info (from signup)
   username: string;
@@ -106,13 +119,13 @@ interface ServiceProviderApprovalFormData {
   // Location
   address: string;
   city: string;
-  province: string; // Moved province to location section
+  province: SriLankaProvince | ""; // Allow empty string for initial state
   
   // Service locations
   serviceLocations: string[];
   
   // Service details
-  serviceTypes: string;
+  serviceTypes: string; // Keep as string to match backend expectations
   coveredEventTypes: string[];
   
   // Media
@@ -339,23 +352,34 @@ export function ServiceProviderApprovalForm({
     }
   };
 
-  const handleSelectChange = (value: string, fieldName: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
+  const handleSelectChange = (value: string, fieldName: keyof ServiceProviderApprovalFormData) => {
+    setFormData(prev => {
+      // Create a copy of the previous state
+      const newState = { ...prev };
+      
+      // Update the field using type assertions for specialized fields
+      if (fieldName === "province") {
+        newState.province = value as SriLankaProvince;
+        
+        // Clear city if province changes
+        newState.city = "";
+      } else if (fieldName === "serviceTypes") {
+        newState.serviceTypes = value;
+      } else {
+        // For other fields, just use a type assertion
+        (newState[fieldName] as any) = value;
+      }
+      
+      return newState;
+    });
   };
 
   const toggleServiceType = (value: string) => {
+    // Since serviceTypes is a string, we need to handle it differently
     setFormData(prev => {
-      // If already selected, remove it; otherwise add it
-      const serviceTypes = prev.serviceTypes.includes(value)
-        ? prev.serviceTypes.filter(type => type !== value)
-        : [...prev.serviceTypes, value];
-      
       return {
         ...prev,
-        serviceTypes
+        serviceTypes: value // Just set it directly to the selected value
       };
     });
   };
@@ -363,7 +387,7 @@ export function ServiceProviderApprovalForm({
   const removeServiceType = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      serviceTypes: prev.serviceTypes.filter(type => type !== value)
+      serviceTypes: "" // Clear the service type
     }));
   };
 
@@ -662,7 +686,7 @@ export function ServiceProviderApprovalForm({
                     <Label htmlFor="province">Province <span className="text-red-500">*</span></Label>
                     <Select
                       value={formData.province}
-                      onValueChange={(value) => handleSelectChange(value, "province")}
+                      onValueChange={(value) => handleSelectChange(value as SriLankaProvince, "province")}
                     >
                       <SelectTrigger
                         id="province"
@@ -694,7 +718,7 @@ export function ServiceProviderApprovalForm({
                         <SelectValue placeholder="Select a city" />
                       </SelectTrigger>
                       <SelectContent>
-                        {formData.province && SRI_LANKA_CITIES[formData.province]?.map((city) => (
+                        {formData.province && SRI_LANKA_CITIES[formData.province as SriLankaProvince]?.map((city) => (
                           <SelectItem key={city} value={city}>
                             {city}
                           </SelectItem>
