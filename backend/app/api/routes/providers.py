@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.api.deps import get_current_user
 from app.models.card import CardModel, PyObjectId
 from bson import ObjectId
+from app.models.package import PackageCreate, PackageUpdate, PackageInDB
+from typing import List
 
 # Configure Cloudinary
 cloudinary.config(
@@ -770,3 +772,227 @@ async def delete_provider_card(
             )
     
     return {"message": "Card deleted successfully"}
+
+# Add these routes to the file
+@router.get("/providers/packages", response_model=list)
+async def get_provider_packages(current_user: UserInDB = Depends(get_current_user)):
+    """Get all packages for the logged-in service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their packages"
+        )
+    
+    db = await get_database()
+    
+    # Get provider packages
+    cursor = db.provider_packages.find({"provider_id": str(current_user.id)})
+    packages = await cursor.to_list(length=100)
+    
+    # Convert ObjectId to string for each package
+    for package in packages:
+        if "_id" in package:
+            package["id"] = str(package["_id"])
+            del package["_id"]
+    
+    return packages
+
+@router.post("/providers/packages", response_model=dict)
+async def create_provider_package(
+    package_data: PackageCreate,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Create a new package for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can create packages"
+        )
+    
+    db = await get_database()
+    
+    # Prepare package data
+    new_package = package_data.dict()
+    new_package["provider_id"] = str(current_user.id)
+    new_package["bookings"] = 0
+    new_package["created_at"] = datetime.utcnow()
+    new_package["updated_at"] = datetime.utcnow()
+    
+    # Insert package
+    result = await db.provider_packages.insert_one(new_package)
+    
+    # Get inserted package document
+    inserted_package = await db.provider_packages.find_one({"_id": result.inserted_id})
+    
+    # Convert ObjectId to string for response
+    inserted_package["id"] = str(inserted_package["_id"])
+    del inserted_package["_id"]
+    
+    return inserted_package
+
+@router.get("/providers/packages/{package_id}", response_model=dict)
+async def get_provider_package(
+    package_id: str,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Get a specific package by ID"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their packages"
+        )
+    
+    db = await get_database()
+    
+    # Get package with validation
+    package = await db.provider_packages.find_one({
+        "_id": ObjectId(package_id),
+        "provider_id": str(current_user.id)
+    })
+    
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+    
+    # Convert ObjectId to string
+    package["id"] = str(package["_id"])
+    del package["_id"]
+    
+    return package
+
+@router.put("/providers/packages/{package_id}", response_model=dict)
+async def update_provider_package(
+    package_id: str,
+    package_data: PackageUpdate,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Update a package for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can update their packages"
+        )
+    
+    db = await get_database()
+    
+    # Make sure the package exists and belongs to this user
+    existing_package = await db.provider_packages.find_one({
+        "_id": ObjectId(package_id),
+        "provider_id": str(current_user.id)
+    })
+    
+    if not existing_package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+    
+    # Prepare update data
+    update_data = {k: v for k, v in package_data.dict(exclude_unset=True).items() if v is not None}
+    update_data["updated_at"] = datetime.utcnow()
+    
+    # Update package
+    result = await db.provider_packages.update_one(
+        {"_id": ObjectId(package_id), "provider_id": str(current_user.id)},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No changes made to package"
+        )
+    
+    # Get updated package
+    updated_package = await db.provider_packages.find_one({"_id": ObjectId(package_id)})
+    updated_package["id"] = str(updated_package["_id"])
+    del updated_package["_id"]
+    
+    return updated_package
+
+@router.delete("/providers/packages/{package_id}", response_model=dict)
+async def delete_provider_package(
+    package_id: str,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Delete a package for service provider"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can delete their packages"
+        )
+    
+    db = await get_database()
+    
+    # Make sure the package exists and belongs to this user
+    existing_package = await db.provider_packages.find_one({
+        "_id": ObjectId(package_id),
+        "provider_id": str(current_user.id)
+    })
+    
+    if not existing_package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+    
+    # Delete package
+    await db.provider_packages.delete_one({"_id": ObjectId(package_id)})
+    
+    return {"message": "Package deleted successfully"}
+
+@router.post("/providers/packages/{package_id}/images", response_model=dict)
+async def upload_package_images(
+    package_id: str,
+    images: List[UploadFile] = File(...),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Upload images for a specific package"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can upload package images"
+        )
+    
+    db = await get_database()
+    
+    # Validate package exists and belongs to this provider
+    package = await db.provider_packages.find_one({
+        "_id": ObjectId(package_id),
+        "provider_id": str(current_user.id)
+    })
+    
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+    
+    # Upload images to Cloudinary
+    image_urls = []
+    
+    try:
+        for image in images:
+            # Upload image
+            result = cloudinary.uploader.upload(
+                image.file,
+                folder=f"eventhub/package_images/{current_user.id}/{package_id}",
+                public_id=f"pkg_{datetime.now().timestamp()}"
+            )
+            image_urls.append(result["secure_url"])
+        
+        # Update package with new images
+        await db.provider_packages.update_one(
+            {"_id": ObjectId(package_id)},
+            {"$push": {"images": {"$each": image_urls}}}
+        )
+        
+        return {"imageUrls": image_urls}
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading images: {str(e)}"
+        )
