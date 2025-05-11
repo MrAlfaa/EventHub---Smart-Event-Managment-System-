@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, status, File, UploadFile, Form
-from typing import List
-from app.models.user import ServiceProviderProfile, ServiceProviderCreate
+from typing import List, Optional
+from app.models.user import ServiceProviderProfile, ServiceProviderCreate, UserInDB
 from app.db.mongodb import get_database
 from datetime import datetime
 from app.core.security import get_password_hash
 import cloudinary
 import cloudinary.uploader
 from app.core.config import settings
+from app.api.deps import get_current_user
 
 # Configure Cloudinary
 cloudinary.config(
@@ -177,3 +178,128 @@ async def complete_service_provider_profile(
     )
     
     return {"message": "Service provider profile submitted for approval"}
+
+@router.post("/providers/gallery/upload", response_model=dict)
+async def upload_gallery_images(
+    images: List[UploadFile] = File(...),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # Check if user is a service provider
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can upload gallery images"
+        )
+    
+    db = await get_database()
+    
+    # Upload images to Cloudinary
+    image_urls = []
+    
+    try:
+        for image in images:
+            # Upload image
+            result = cloudinary.uploader.upload(
+                image.file,
+                folder=f"eventhub/provider_gallery/{current_user.id}",
+                public_id=f"gallery_{datetime.now().timestamp()}"
+            )
+            image_urls.append(result["secure_url"])
+        
+        # Store image URLs in database
+        provider_gallery = await db.provider_galleries.find_one({"provider_id": str(current_user.id)})
+        
+        if provider_gallery:
+            # Add new images to existing gallery
+            await db.provider_galleries.update_one(
+                {"provider_id": str(current_user.id)},
+                {"$push": {"images": {"$each": image_urls}}}
+            )
+        else:
+            # Create new gallery for provider
+            await db.provider_galleries.insert_one({
+                "provider_id": str(current_user.id),
+                "images": image_urls,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            })
+        
+        return {"imageUrls": image_urls}
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading images: {str(e)}"
+        )
+
+@router.get("/providers/gallery", response_model=dict)
+async def get_gallery_images(current_user: UserInDB = Depends(get_current_user)):
+    # Check if user is a service provider
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their gallery"
+        )
+    
+    db = await get_database()
+    
+    # Get provider gallery
+    provider_gallery = await db.provider_galleries.find_one({"provider_id": str(current_user.id)})
+    
+    if provider_gallery:
+        return {"images": provider_gallery.get("images", [])}
+    
+    return {"images": []}
+
+@router.delete("/providers/gallery/image", response_model=dict)
+async def delete_gallery_image(
+    imageUrl: str,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # Check if user is a service provider
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can delete gallery images"
+        )
+    
+    if not imageUrl:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image URL is required"
+        )
+    
+    db = await get_database()
+    
+    # Remove image from gallery
+    result = await db.provider_galleries.update_one(
+        {"provider_id": str(current_user.id)},
+        {"$pull": {"images": imageUrl}}
+    )
+    
+    if result.matched_count == 0:
+        # If no document was found, the gallery doesn't exist
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gallery not found"
+        )
+    
+    # Try to delete from Cloudinary (extract public_id from URL)
+    try:
+        # Extract public ID from URL
+        url_parts = imageUrl.split('/')
+        if "upload" in url_parts:
+            upload_index = url_parts.index("upload")
+            if upload_index + 2 < len(url_parts):
+                # The format is typically: .../upload/v1234567890/folder/filename.ext
+                # We need to get the part after the version (folder/filename)
+                folder_and_file = '/'.join(url_parts[upload_index+2:])
+                # Remove extension
+                public_id = '.'.join(folder_and_file.split('.')[:-1])
+                # Try to delete from Cloudinary
+                cloudinary.uploader.destroy(public_id)
+    except Exception as e:
+        # Log error but don't fail the request if Cloudinary delete fails
+        print(f"Error deleting image from Cloudinary: {str(e)}")
+    
+    return {"message": "Image deleted successfully"}
