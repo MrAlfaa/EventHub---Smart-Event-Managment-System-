@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -29,7 +29,8 @@ import {
   Calendar, 
   MapPin, 
   Bell,
-  Image
+  Image,
+  Loader
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -39,83 +40,15 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import adminService, { Promotion } from "@/services/adminService";
+import { formatDate } from "@/utils/dateUtils";
+import { PublicEvent } from "@/types";
 
 // Define interfaces for both promotions and public events
-interface Promotion {
-  id: string;
-  type: "promotion";
-  title: string;
-  description: string;
-  bannerImage: string;
-  validUntil: string;
-  publishedDate: string;
-  status: string;
-  promoCode?: string;
-  terms?: string[];
-}
-
-interface PublicEvent {
-  id: string;
-  type: "event";
-  title: string;
-  description: string;
-  bannerImage: string;
-  location: string;
-  eventDate: string;
-  publishedDate: string;
-  status: string;
-}
-
-type ContentItem = Promotion | PublicEvent;
-
-// Mock data for promotions and events
-const mockItems: ContentItem[] = [
-  {
-    id: "promo-1",
-    type: "promotion",
-    title: "Summer Wedding Special",
-    description: "Exclusive packages for summer weddings with 20% discount",
-    bannerImage: "https://placehold.co/600x400/orange/white?text=Summer+Wedding",
-    validUntil: "2025-07-15",
-    publishedDate: "2025-03-15",
-    status: "active",
-  },
-  {
-    id: "promo-2",
-    type: "promotion",
-    title: "Corporate Event Solutions",
-    description: "Complete solutions for corporate events and conferences",
-    bannerImage: "https://placehold.co/600x400/blue/white?text=Corporate+Events",
-    validUntil: "2025-06-10",
-    publishedDate: "2025-03-10",
-    status: "active",
-  },
-  {
-    id: "event-1",
-    type: "event",
-    title: "Wedding Fair 2025",
-    description: "The biggest wedding fair of the year with top vendors and service providers",
-    bannerImage: "https://placehold.co/600x400/purple/white?text=Wedding+Fair",
-    location: "Colombo City Center, Grand Ballroom",
-    eventDate: "2025-05-25",
-    publishedDate: "2025-02-25",
-    status: "active",
-  },
-  {
-    id: "event-2",
-    type: "event",
-    title: "Event Planners Conference",
-    description: "Annual conference for event planners and service providers",
-    bannerImage: "https://placehold.co/600x400/pink/white?text=Planners+Conference",
-    location: "Shangri-La Hotel, Colombo",
-    eventDate: "2025-06-20",
-    publishedDate: "2025-02-20",
-    status: "draft",
-  },
-];
+type ContentItem = Promotion;
 
 const PromotionsManager = () => {
-  const [items, setItems] = useState<ContentItem[]>(mockItems);
+  const [items, setItems] = useState<ContentItem[]>([]);
   const [contentType, setContentType] = useState<string>("promotion");
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -125,10 +58,10 @@ const PromotionsManager = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState<boolean>(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Create new promotion state
-  const [newPromotion, setNewPromotion] = useState<Promotion>({
-    id: `promo-${Date.now()}`,
+  const [newPromotion, setNewPromotion] = useState<Partial<Promotion>>({
     type: "promotion",
     title: "",
     description: "",
@@ -141,8 +74,7 @@ const PromotionsManager = () => {
   });
 
   // Create new event state
-  const [newEvent, setNewEvent] = useState<PublicEvent>({
-    id: `event-${Date.now()}`,
+  const [newEvent, setNewEvent] = useState<Partial<Promotion>>({
     type: "event",
     title: "",
     description: "",
@@ -154,8 +86,7 @@ const PromotionsManager = () => {
   });
 
   // For editing existing items
-  const [editingPromotion, setEditingPromotion] = useState<Promotion>({
-    id: '',
+  const [editingPromotion, setEditingPromotion] = useState<Partial<Promotion>>({
     type: "promotion",
     title: "",
     description: "",
@@ -165,8 +96,7 @@ const PromotionsManager = () => {
     status: "draft",
   });
   
-  const [editingEvent, setEditingEvent] = useState<PublicEvent>({
-    id: '',
+  const [editingEvent, setEditingEvent] = useState<Partial<Promotion>>({
     type: "event",
     title: "",
     description: "",
@@ -176,6 +106,28 @@ const PromotionsManager = () => {
     publishedDate: "",
     status: "draft",
   });
+
+  // File upload states
+  const [promotionBannerFile, setPromotionBannerFile] = useState<File | null>(null);
+  const [eventBannerFile, setEventBannerFile] = useState<File | null>(null);
+
+  // Fetch promotions and events on component mount
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+  const fetchItems = async () => {
+    setIsLoading(true);
+    try {
+      const promotions = await adminService.getAllPromotions();
+      setItems(promotions);
+    } catch (error) {
+      console.error("Error fetching promotions:", error);
+      toast.error("Failed to load promotions and events");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredItems = items.filter((item) => {
     // Filter by status tab
@@ -200,72 +152,148 @@ const PromotionsManager = () => {
     return true;
   });
 
-  const handleAddItem = () => {
-    if (createType === "promotion") {
-      // Validate promotion fields
-      if (!newPromotion.title || !newPromotion.description || !newPromotion.validUntil) {
-        toast.error("Please fill in all required fields");
-        return;
+  const handleAddItem = async () => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      
+      if (createType === "promotion") {
+        // Validate promotion fields
+        if (!newPromotion.title || !newPromotion.description || !newPromotion.validUntil) {
+          toast.error("Please fill in all required fields");
+          return;
+        }
+        
+        // Add promotion fields to formData
+        formData.append("type", "promotion");
+        formData.append("title", newPromotion.title || "");
+        formData.append("description", newPromotion.description || "");
+        formData.append("status", "draft");
+        formData.append("validUntil", newPromotion.validUntil || "");
+        
+        if (newPromotion.promoCode) {
+          formData.append("promoCode", newPromotion.promoCode);
+        }
+        
+        if (newPromotion.terms && newPromotion.terms.length > 0) {
+          formData.append("terms", newPromotion.terms.join('\n'));
+        }
+        
+        // Add banner image if selected
+        if (promotionBannerFile) {
+          formData.append("bannerImage", promotionBannerFile);
+        }
+        
+        // Send request to create promotion
+        const createdPromotion = await adminService.createPromotion(formData);
+        
+        // Update state with new promotion
+        setItems([...items, createdPromotion]);
+        
+        // Reset form state
+        setNewPromotion({
+          type: "promotion",
+          title: "",
+          description: "",
+          bannerImage: "",
+          validUntil: "",
+          publishedDate: new Date().toISOString().split('T')[0],
+          status: "draft",
+          promoCode: "",
+          terms: [],
+        });
+        setPromotionBannerFile(null);
+        
+        toast.success("Promotion created successfully");
+      } else {
+        // Validate event fields
+        if (!newEvent.title || !newEvent.description || !newEvent.location || !newEvent.eventDate) {
+          toast.error("Please fill in all required fields");
+          return;
+        }
+        
+        // Add event fields to formData
+        formData.append("type", "event");
+        formData.append("title", newEvent.title || "");
+        formData.append("description", newEvent.description || "");
+        formData.append("status", "draft");
+        formData.append("location", newEvent.location || "");
+        formData.append("eventDate", newEvent.eventDate || "");
+        
+        // Add banner image if selected
+        if (eventBannerFile) {
+          formData.append("bannerImage", eventBannerFile);
+        }
+        
+        // Send request to create event
+        const createdEvent = await adminService.createPromotion(formData);
+        
+        // Update state with new event
+        setItems([...items, createdEvent]);
+        
+        // Reset form state
+        setNewEvent({
+          type: "event",
+          title: "",
+          description: "",
+          bannerImage: "",
+          location: "",
+          eventDate: "",
+          publishedDate: new Date().toISOString().split('T')[0],
+          status: "draft",
+        });
+        setEventBannerFile(null);
+        
+        toast.success("Public Event created successfully");
       }
-      
-      setItems([...items, newPromotion]);
-      
-      setNewPromotion({
-        id: `promo-${Date.now()}`,
-        type: "promotion",
-        title: "",
-        description: "",
-        bannerImage: "",
-        validUntil: "",
-        publishedDate: new Date().toISOString().split('T')[0],
-        status: "draft",
-        promoCode: "",
-        terms: [],
-      });
-      
-      toast.success("Promotion created successfully");
-    } else {
-      // Validate event fields
-      if (!newEvent.title || !newEvent.description || !newEvent.location || !newEvent.eventDate) {
-        toast.error("Please fill in all required fields");
-        return;
-      }
-      
-      setItems([...items, newEvent]);
-      
-      setNewEvent({
-        id: `event-${Date.now()}`,
-        type: "event",
-        title: "",
-        description: "",
-        bannerImage: "",
-        location: "",
-        eventDate: "",
-        publishedDate: new Date().toISOString().split('T')[0],
-        status: "draft",
-      });
-      
-      toast.success("Public Event created successfully");
+    } catch (error) {
+      console.error("Error creating item:", error);
+      toast.error("Failed to create item. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setIsCreateDialogOpen(false);
     }
-    
-    setIsCreateDialogOpen(false);
   };
 
-  const handlePublish = (id: string) => {
-    setItems(
-      items.map((item) =>
-        item.id === id ? { ...item, status: "active" } : item
-      )
-    );
-    setIsViewDialogOpen(false);
-    toast.success("Item published successfully");
+  const handlePublish = async (id: string) => {
+    setIsLoading(true);
+    try {
+      await adminService.publishPromotion(id);
+      
+      // Update local state
+      setItems(
+        items.map((item) =>
+          item.id === id ? { ...item, status: "active" } : item
+        )
+      );
+      
+      setIsViewDialogOpen(false);
+      toast.success("Item published successfully");
+    } catch (error) {
+      console.error("Error publishing item:", error);
+      toast.error("Failed to publish item. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-    setIsDeleteDialogOpen(false);
-    setIsViewDialogOpen(false);
-    toast.success("Item deleted successfully");
+  const handleDelete = async (id: string) => {
+    setIsLoading(true);
+    try {
+      await adminService.deletePromotion(id);
+      
+      // Update local state
+      setItems(items.filter((item) => item.id !== id));
+      
+      setIsDeleteDialogOpen(false);
+      setIsViewDialogOpen(false);
+      toast.success("Item deleted successfully");
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("Failed to delete item. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleViewItem = (item: ContentItem) => {
@@ -279,48 +307,100 @@ const PromotionsManager = () => {
     
     // Setup edit form based on item type
     if (item.type === "promotion") {
-      setEditingPromotion(item as Promotion);
+      setEditingPromotion(item);
       setCreateType("promotion");
     } else {
-      setEditingEvent(item as PublicEvent);
+      setEditingEvent(item);
       setCreateType("event");
     }
     
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateItem = () => {
-    if (createType === "promotion") {
-      // Validate promotion fields
-      if (!editingPromotion.title || !editingPromotion.description || !editingPromotion.validUntil) {
-        toast.error("Please fill in all required fields");
-        return;
+  const handleUpdateItem = async () => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      
+      if (createType === "promotion") {
+        // Validate promotion fields
+        if (!editingPromotion.title || !editingPromotion.description || !editingPromotion.validUntil) {
+          toast.error("Please fill in all required fields");
+          return;
+        }
+        
+        // Add promotion fields to formData
+        formData.append("type", "promotion");
+        formData.append("title", editingPromotion.title || "");
+        formData.append("description", editingPromotion.description || "");
+        formData.append("status", editingPromotion.status || "draft");
+        formData.append("validUntil", editingPromotion.validUntil || "");
+        
+        if (editingPromotion.promoCode) {
+          formData.append("promoCode", editingPromotion.promoCode);
+        }
+        
+        if (editingPromotion.terms && editingPromotion.terms.length > 0) {
+          formData.append("terms", editingPromotion.terms.join('\n'));
+        }
+        
+        // Add banner image if selected
+        if (promotionBannerFile) {
+          formData.append("bannerImage", promotionBannerFile);
+        }
+        
+        // Send request to update promotion
+        const updatedPromotion = await adminService.updatePromotion(editingPromotion.id as string, formData);
+        
+        // Update state with updated promotion
+        setItems(
+          items.map((item) =>
+            item.id === editingPromotion.id ? updatedPromotion : item
+          )
+        );
+        
+        setPromotionBannerFile(null);
+        toast.success("Promotion updated successfully");
+      } else {
+        // Validate event fields
+        if (!editingEvent.title || !editingEvent.description || !editingEvent.location || !editingEvent.eventDate) {
+          toast.error("Please fill in all required fields");
+          return;
+        }
+        
+        // Add event fields to formData
+        formData.append("type", "event");
+        formData.append("title", editingEvent.title || "");
+        formData.append("description", editingEvent.description || "");
+        formData.append("status", editingEvent.status || "draft");
+        formData.append("location", editingEvent.location || "");
+        formData.append("eventDate", editingEvent.eventDate || "");
+        
+        // Add banner image if selected
+        if (eventBannerFile) {
+          formData.append("bannerImage", eventBannerFile);
+        }
+        
+        // Send request to update event
+        const updatedEvent = await adminService.updatePromotion(editingEvent.id as string, formData);
+        
+        // Update state with updated event
+        setItems(
+          items.map((item) =>
+            item.id === editingEvent.id ? updatedEvent : item
+          )
+        );
+        
+        setEventBannerFile(null);
+        toast.success("Public Event updated successfully");
       }
-      
-      setItems(
-        items.map((item) =>
-          item.id === editingPromotion.id ? editingPromotion : item
-        )
-      );
-      
-      toast.success("Promotion updated successfully");
-    } else {
-      // Validate event fields
-      if (!editingEvent.title || !editingEvent.description || !editingEvent.location || !editingEvent.eventDate) {
-        toast.error("Please fill in all required fields");
-        return;
-      }
-      
-      setItems(
-        items.map((item) =>
-          item.id === editingEvent.id ? editingEvent : item
-        )
-      );
-      
-      toast.success("Public Event updated successfully");
+    } catch (error) {
+      console.error("Error updating item:", error);
+      toast.error("Failed to update item. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setIsEditDialogOpen(false);
     }
-    
-    setIsEditDialogOpen(false);
   };
 
   const getStatusBadgeStyles = (status: string) => {
@@ -363,13 +443,13 @@ const PromotionsManager = () => {
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-bold">{selectedItem.title}</h2>
             <p className="text-gray-500">
-              Published: {new Date(selectedItem.publishedDate).toLocaleDateString()}
+              Published: {formatDate(selectedItem.publishedDate)}
             </p>
           </div>
           
           <div className="flex items-center gap-2 text-orange-600">
             <Calendar className="h-4 w-4" />
-            <span>Valid until: {new Date(selectedItem.validUntil).toLocaleDateString()}</span>
+            <span>Valid until: {selectedItem.validUntil ? formatDate(selectedItem.validUntil) : 'Not specified'}</span>
           </div>
 
           {selectedItem.promoCode && (
@@ -407,18 +487,22 @@ const PromotionsManager = () => {
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-bold">{selectedItem.title}</h2>
             <p className="text-gray-500">
-              Published: {new Date(selectedItem.publishedDate).toLocaleDateString()}
+              Published: {formatDate(selectedItem.publishedDate)}
             </p>
           </div>
           
           <div className="flex items-center gap-2 text-blue-600">
             <Calendar className="h-4 w-4" />
-            <span>Event date: {new Date(selectedItem.eventDate).toLocaleDateString()}</span>
+            <span>Event date: {selectedItem.eventDate ? formatDate(selectedItem.eventDate) : 'Not specified'}</span>
           </div>
           
           <div className="flex items-center gap-2 text-emerald-600">
             <MapPin className="h-4 w-4" />
-            <span>Location: {selectedItem.location}</span>
+            <span className="truncate">
+              {typeof selectedItem.location === 'string' ? selectedItem.location : 
+               (typeof selectedItem.location === 'object' && selectedItem.location ? 
+                (selectedItem.location as any).address : 'Location not specified')}
+            </span>
           </div>
           
           <p className="text-gray-600">{selectedItem.description}</p>
@@ -498,7 +582,12 @@ const PromotionsManager = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  {filteredItems.filter(item => item.type === "promotion").length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex h-32 flex-col items-center justify-center text-center">
+                      <Loader className="h-8 w-8 animate-spin text-gray-400" />
+                      <p className="mt-2 text-gray-500">Loading promotions...</p>
+                    </div>
+                  ) : filteredItems.filter(item => item.type === "promotion").length === 0 ? (
                     <div className="flex h-32 flex-col items-center justify-center text-center">
                       <p className="text-gray-500">No promotions found</p>
                       <div className="flex gap-2 mt-4">
@@ -551,7 +640,7 @@ const PromotionsManager = () => {
                               <div className="mb-4 text-xs text-gray-500">
                                 <div className="flex items-center gap-1 text-orange-600">
                                   <Calendar className="h-3 w-3" />
-                                  <span>Valid until: {new Date((item as Promotion).validUntil).toLocaleDateString()}</span>
+                                  <span>Valid until: {item.validUntil ? formatDate(item.validUntil) : 'Not specified'}</span>
                                 </div>
                               </div>
                               
@@ -621,7 +710,12 @@ const PromotionsManager = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  {filteredItems.filter(item => item.type === "event").length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex h-32 flex-col items-center justify-center text-center">
+                      <Loader className="h-8 w-8 animate-spin text-gray-400" />
+                      <p className="mt-2 text-gray-500">Loading public events...</p>
+                    </div>
+                  ) : filteredItems.filter(item => item.type === "event").length === 0 ? (
                     <div className="flex h-32 flex-col items-center justify-center text-center">
                       <p className="text-gray-500">No public events found</p>
                       <div className="flex gap-2 mt-4">
@@ -674,11 +768,11 @@ const PromotionsManager = () => {
                               <div className="mb-4 text-xs text-gray-500">
                                 <div className="flex items-center gap-1 text-blue-600">
                                   <Calendar className="h-3 w-3" />
-                                  <span>Event date: {new Date((item as PublicEvent).eventDate).toLocaleDateString()}</span>
+                                  <span>Event date: {item.eventDate ? formatDate(item.eventDate) : 'Not specified'}</span>
                                 </div>
                                 <div className="flex items-center gap-1 text-emerald-600 mt-1">
                                   <MapPin className="h-3 w-3" />
-                                  <span className="truncate">{(item as PublicEvent).location}</span>
+                                  <span className="truncate">{item.location}</span>
                                 </div>
                               </div>
                               
@@ -842,6 +936,7 @@ const PromotionsManager = () => {
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
+                            setPromotionBannerFile(file);
                             const imageUrl = URL.createObjectURL(file);
                             setNewPromotion({
                               ...newPromotion,
@@ -940,12 +1035,12 @@ const PromotionsManager = () => {
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
+                            setEventBannerFile(file);
                             const imageUrl = URL.createObjectURL(file);
                             setNewEvent({
                               ...newEvent,
                               bannerImage: imageUrl,
                             });
-                            toast.success("Banner image uploaded successfully");
                           }
                         }}
                       />
@@ -976,11 +1071,20 @@ const PromotionsManager = () => {
           </div>
 
           <DialogFooter className="flex-none mt-4">
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button onClick={handleAddItem}>
-              {createType === "promotion" ? "Create Promotion" : "Create Public Event"}
+            <Button onClick={handleAddItem} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  {createType === "promotion" ? "Create Promotion" : "Create Public Event"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1024,6 +1128,7 @@ const PromotionsManager = () => {
                     setIsDeleteDialogOpen(true);
                   }}
                   className="gap-2"
+                  disabled={isLoading}
                 >
                   <Trash size={16} /> Delete
                 </Button>
@@ -1032,6 +1137,7 @@ const PromotionsManager = () => {
                     variant="outline"
                     className="gap-2"
                     onClick={() => handleEditItem(selectedItem)}
+                    disabled={isLoading}
                   >
                     <Edit size={16} /> Edit
                   </Button>
@@ -1039,9 +1145,19 @@ const PromotionsManager = () => {
                     <Button
                       onClick={() => handlePublish(selectedItem.id)}
                       className="gap-2"
+                      disabled={isLoading}
                     >
-                      <Bell size={16} className="mr-1" />
-                      Publish
+                      {isLoading ? (
+                        <>
+                          <Loader className="h-4 w-4 animate-spin" />
+                          Publishing...
+                        </>
+                      ) : (
+                        <>
+                          <Bell size={16} className="mr-1" />
+                          Publish
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>
@@ -1067,15 +1183,26 @@ const PromotionsManager = () => {
             <Button
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={() => selectedItem && handleDelete(selectedItem.id)}
+              disabled={isLoading}
             >
-              <Trash size={16} className="mr-2" />
-              Delete
+              {isLoading ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash size={16} className="mr-2" />
+                  Delete
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1193,6 +1320,7 @@ const PromotionsManager = () => {
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
+                            setPromotionBannerFile(file);
                             const imageUrl = URL.createObjectURL(file);
                             setEditingPromotion({
                               ...editingPromotion,
@@ -1310,6 +1438,7 @@ const PromotionsManager = () => {
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
+                            setEventBannerFile(file);
                             const imageUrl = URL.createObjectURL(file);
                             setEditingEvent({
                               ...editingEvent,
@@ -1365,11 +1494,20 @@ const PromotionsManager = () => {
           </div>
 
           <DialogFooter className="flex-none mt-4">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateItem}>
-              Update {createType === "promotion" ? "Promotion" : "Public Event"}
+            <Button onClick={handleUpdateItem} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  Update {createType === "promotion" ? "Promotion" : "Public Event"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

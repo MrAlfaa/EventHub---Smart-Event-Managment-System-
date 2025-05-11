@@ -90,6 +90,22 @@ export interface AdminUserData {
   updated_at: string;
 }
 
+// Define promotion interfaces to match API response
+export interface Promotion {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  bannerImage?: string;
+  validUntil?: string;
+  publishedDate: string;
+  status: string;
+  promoCode?: string;
+  terms?: string[];
+  location?: string;
+  eventDate?: string;
+}
+
 // Admin service functions
 const adminService = {
   // Check if super admin exists
@@ -200,6 +216,69 @@ const adminService = {
       if (error.message === 'Network Error') {
         console.error('This may be a CORS issue. Check your backend CORS settings.');
       }
+      throw error;
+    }
+  },
+
+  // Promotion management functions
+  
+  // Get all promotions
+  getAllPromotions: async (): Promise<Promotion[]> => {
+    try {
+      const response = await adminApi.get('/admin/promotions');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching promotions:', error);
+      throw error;
+    }
+  },
+
+  // Create a new promotion
+  createPromotion: async (formData: FormData): Promise<Promotion> => {
+    try {
+      const response = await adminApi.post('/admin/promotions', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error creating promotion:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing promotion
+  updatePromotion: async (id: string, formData: FormData): Promise<Promotion> => {
+    try {
+      const response = await adminApi.put(`/admin/promotions/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating promotion:', error);
+      throw error;
+    }
+  },
+
+  // Delete a promotion
+  deletePromotion: async (id: string): Promise<void> => {
+    try {
+      await adminApi.delete(`/admin/promotions/${id}`);
+    } catch (error: any) {
+      console.error('Error deleting promotion:', error);
+      throw error;
+    }
+  },
+
+  // Publish a promotion
+  publishPromotion: async (id: string): Promise<void> => {
+    try {
+      await adminApi.post(`/admin/promotions/${id}/publish`);
+    } catch (error: any) {
+      console.error('Error publishing promotion:', error);
       throw error;
     }
   },
