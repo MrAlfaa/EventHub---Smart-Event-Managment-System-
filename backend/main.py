@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import users, auth, providers, admin
+from app.api.routes import users, auth, providers, admin, promotions
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 app = FastAPI(title="EventHub API")
@@ -29,6 +29,7 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(providers.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
+app.include_router(promotions.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():

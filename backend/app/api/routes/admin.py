@@ -1,14 +1,25 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Query, Body, UploadFile, File, Form
 from app.models.user import UserCreate, UserInDB
 from app.schemas.admin import SuperAdminCheck, SuperAdminCreate, ServiceProviderApprovalAction
+from app.schemas.promotions import PromotionCreate, PublicEventCreate, PromotionUpdate, PublicEventUpdate, PromotionResponse
 from app.core.security import get_password_hash
 from app.db.mongodb import get_database
 from datetime import datetime
 from app.api.deps import get_current_user, get_current_admin_user
-from typing import List
+from typing import List, Optional
 from bson.objectid import ObjectId
+import cloudinary
+import cloudinary.uploader
+from app.core.config import settings
 
 router = APIRouter()
+
+# Configure Cloudinary for image uploads
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET
+)
 
 @router.get("/admin/check-superadmin", response_model=SuperAdminCheck)
 async def check_superadmin_exists():
@@ -259,3 +270,271 @@ async def get_admin_stats(
         "service_providers_count": service_providers_count,
         "pending_providers_count": pending_providers_count,
     }
+
+# Promotions Management Routes
+@router.post("/admin/promotions", response_model=PromotionResponse)
+async def create_promotion(
+    title: str = Form(...),
+    description: str = Form(...),
+    type: str = Form(...),
+    status: str = Form("draft"),
+    validUntil: Optional[str] = Form(None),
+    promoCode: Optional[str] = Form(None),
+    terms: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    eventDate: Optional[str] = Form(None),
+    bannerImage: Optional[UploadFile] = File(None),
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Create a new promotion or public event"""
+    db = await get_database()
+    
+    promotion_data = {
+        "title": title,
+        "description": description,
+        "type": type,
+        "status": status,
+        "published_date": datetime.utcnow().isoformat(),
+        "created_by": str(current_admin.id),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    
+    # Add type-specific fields
+    if type == "promotion":
+        promotion_data["valid_until"] = validUntil
+        promotion_data["promo_code"] = promoCode
+        promotion_data["terms"] = terms.split('\n') if terms else []
+    elif type == "event":
+        promotion_data["location"] = location
+        promotion_data["event_date"] = eventDate
+    
+    # Handle banner image upload
+    if bannerImage:
+        try:
+            upload_result = cloudinary.uploader.upload(
+                bannerImage.file,
+                folder="eventhub/promotions",
+                public_id=f"promo_{datetime.now().timestamp()}"
+            )
+            promotion_data["banner_image"] = upload_result["secure_url"]
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error uploading image: {str(e)}"
+            )
+    
+    # Insert into database
+    result = await db.promotions.insert_one(promotion_data)
+    
+    # Get the created document
+    created_promotion = await db.promotions.find_one({"_id": result.inserted_id})
+    
+    # Transform to response format
+    response = {
+        "id": str(created_promotion["_id"]),
+        "title": created_promotion["title"],
+        "description": created_promotion["description"],
+        "type": created_promotion["type"],
+        "bannerImage": created_promotion.get("banner_image"),
+        "status": created_promotion["status"],
+        "publishedDate": created_promotion["published_date"],
+    }
+    
+    # Add type-specific fields to response
+    if type == "promotion":
+        response["validUntil"] = created_promotion.get("valid_until")
+        response["promoCode"] = created_promotion.get("promo_code")
+        response["terms"] = created_promotion.get("terms", [])
+    elif type == "event":
+        response["location"] = created_promotion.get("location")
+        response["eventDate"] = created_promotion.get("event_date")
+    
+    return response
+
+@router.get("/admin/promotions", response_model=List[PromotionResponse])
+async def get_promotions(
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Get all promotions with optional filters"""
+    db = await get_database()
+    
+    # Build query based on filters
+    query = {}
+    if type:
+        query["type"] = type
+    if status:
+        query["status"] = status
+    
+    # Get promotions from database
+    cursor = db.promotions.find(query)
+    promotions = await cursor.to_list(length=100)
+    
+    # Transform for response
+    result = []
+    for promo in promotions:
+        response_item = {
+            "id": str(promo["_id"]),
+            "title": promo["title"],
+            "description": promo["description"],
+            "type": promo["type"],
+            "bannerImage": promo.get("banner_image"),
+            "status": promo["status"],
+            "publishedDate": promo["published_date"],
+        }
+        
+        # Add type-specific fields
+        if promo["type"] == "promotion":
+            response_item["validUntil"] = promo.get("valid_until")
+            response_item["promoCode"] = promo.get("promo_code")
+            response_item["terms"] = promo.get("terms", [])
+        elif promo["type"] == "event":
+            response_item["location"] = promo.get("location")
+            response_item["eventDate"] = promo.get("event_date")
+        
+        result.append(response_item)
+    
+    return result
+
+@router.put("/admin/promotions/{promotion_id}", response_model=PromotionResponse)
+async def update_promotion(
+    promotion_id: str,
+    title: str = Form(...),
+    description: str = Form(...),
+    type: str = Form(...),
+    status: str = Form(...),
+    validUntil: Optional[str] = Form(None),
+    promoCode: Optional[str] = Form(None),
+    terms: Optional[str] = Form(None),
+    location: Optional[str] = Form(None),
+    eventDate: Optional[str] = Form(None),
+    bannerImage: Optional[UploadFile] = File(None),
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Update an existing promotion or public event"""
+    db = await get_database()
+    
+    # Check if promotion exists
+    existing_promotion = await db.promotions.find_one({"_id": ObjectId(promotion_id)})
+    if not existing_promotion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promotion not found"
+        )
+    
+    # Prepare update data
+    update_data = {
+        "title": title,
+        "description": description,
+        "type": type,
+        "status": status,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    
+    # Add type-specific fields
+    if type == "promotion":
+        update_data["valid_until"] = validUntil
+        update_data["promo_code"] = promoCode
+        update_data["terms"] = terms.split('\n') if terms else []
+    elif type == "event":
+        update_data["location"] = location
+        update_data["event_date"] = eventDate
+    
+    # Handle banner image upload
+    if bannerImage:
+        try:
+            upload_result = cloudinary.uploader.upload(
+                bannerImage.file,
+                folder="eventhub/promotions",
+                public_id=f"promo_{datetime.now().timestamp()}"
+            )
+            update_data["banner_image"] = upload_result["secure_url"]
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error uploading image: {str(e)}"
+            )
+    
+    # Update in database
+    await db.promotions.update_one(
+        {"_id": ObjectId(promotion_id)},
+        {"$set": update_data}
+    )
+    
+    # Get the updated document
+    updated_promotion = await db.promotions.find_one({"_id": ObjectId(promotion_id)})
+    
+    # Transform to response format
+    response = {
+        "id": str(updated_promotion["_id"]),
+        "title": updated_promotion["title"],
+        "description": updated_promotion["description"],
+        "type": updated_promotion["type"],
+        "bannerImage": updated_promotion.get("banner_image"),
+        "status": updated_promotion["status"],
+        "publishedDate": updated_promotion["published_date"],
+    }
+    
+    # Add type-specific fields to response
+    if type == "promotion":
+        response["validUntil"] = updated_promotion.get("valid_until")
+        response["promoCode"] = updated_promotion.get("promo_code")
+        response["terms"] = updated_promotion.get("terms", [])
+    elif type == "event":
+        response["location"] = updated_promotion.get("location")
+        response["eventDate"] = updated_promotion.get("event_date")
+    
+    return response
+
+@router.delete("/admin/promotions/{promotion_id}", response_model=dict)
+async def delete_promotion(
+    promotion_id: str,
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Delete a promotion or public event"""
+    db = await get_database()
+    
+    # Check if promotion exists
+    existing_promotion = await db.promotions.find_one({"_id": ObjectId(promotion_id)})
+    if not existing_promotion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promotion not found"
+        )
+    
+    # Delete from database
+    await db.promotions.delete_one({"_id": ObjectId(promotion_id)})
+    
+    return {"message": "Promotion deleted successfully"}
+
+@router.post("/admin/promotions/{promotion_id}/publish", response_model=dict)
+async def publish_promotion(
+    promotion_id: str,
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Publish a promotion or public event"""
+    db = await get_database()
+    
+    # Check if promotion exists
+    existing_promotion = await db.promotions.find_one({"_id": ObjectId(promotion_id)})
+    if not existing_promotion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Promotion not found"
+        )
+    
+    # Update status
+    await db.promotions.update_one(
+        {"_id": ObjectId(promotion_id)},
+        {
+            "$set": {
+                "status": "active",
+                "published_date": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    
+    return {"message": "Promotion published successfully"}
