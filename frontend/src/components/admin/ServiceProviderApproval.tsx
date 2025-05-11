@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
-  Eye,
-  Tag,
-  User,
-  CheckCircle,
-  Calendar,
-  XCircle,
-  FileX,
-  MapPin,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Filter,
-  Building,
-  AlertCircle
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -30,6 +20,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Search,
+  Filter,
+  RefreshCw,
+  Building,
+  User,
+  Calendar,
+  MapPin,
+  Tag,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Eye,
+} from "lucide-react";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,444 +45,650 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import ServiceProviderDetailsDialog, { ServiceProvider } from "./ServiceProviderDetailsDialog";
+import ServiceProviderDetailsDialog from "./ServiceProviderDetailsDialog";
 import adminService from "@/services/adminService";
+import { formatDistanceToNow } from "date-fns";
 
+// Interfaces
+interface ServiceProvider {
+  id: string;
+  businessName: string;
+  providerName: string;
+  email: string;
+  phone: string;
+  serviceType: string;
+  location: string;
+  registrationDate: string;
+  status: string;
+  nicNumber: string;
+  nicFrontImage: string;
+  nicBackImage: string;
+  businessRegistrationNumber?: string;
+  businessDescription?: string;
+  profilePicture?: string;
+  coverPhoto?: string;
+  userId: string;
+}
+
+// Main component
 const ServiceProviderApproval: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("pending");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
-  const [locationFilter, setLocationFilter] = useState("all");
-  
-  // New state variables for API data
-  const [pendingProviders, setPendingProviders] = useState<ServiceProvider[]>([]);
-  const [approvedProviders, setApprovedProviders] = useState<ServiceProvider[]>([]);
-  const [rejectedProviders, setRejectedProviders] = useState<ServiceProvider[]>([]);
+  // State
+  const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([]);
+  const [filteredProviders, setFilteredProviders] = useState<ServiceProvider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Existing state for confirmation dialogs and actions
-  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [providerToAction, setProviderToAction] = useState<ServiceProvider | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  
-  // Pagination state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("pending");
+  const [filterServiceType, setFilterServiceType] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const providersPerPage = 5;
+  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [sortField, setSortField] = useState<string>("registrationDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch data on component mount and when tab changes
-  useEffect(() => {
-    fetchServiceProviders();
-  }, [activeTab]);
-
-  // Function to fetch service providers based on active tab
+  // Fetch service providers
   const fetchServiceProviders = async () => {
-    setIsLoading(true);
     try {
-      if (activeTab === "pending") {
-        const data = await adminService.getPendingServiceProviders();
-        // Map API data to component's expected format
-        const formattedData = data.map(mapApiDataToServiceProvider);
-        setPendingProviders(formattedData);
-      } else if (activeTab === "approved") {
-        const data = await adminService.getApprovedServiceProviders();
-        const formattedData = data.map(mapApiDataToServiceProvider);
-        setApprovedProviders(formattedData);
-      } else if (activeTab === "rejected") {
-        const data = await adminService.getRejectedServiceProviders();
-        const formattedData = data.map(mapApiDataToServiceProvider);
-        setRejectedProviders(formattedData);
-      }
+      setIsLoading(true);
+      
+      // Get pending providers from your API
+      const pendingProviders = await adminService.getPendingServiceProviders();
+      // Get approved and rejected providers
+      const approvedProviders = await adminService.getApprovedServiceProviders();
+      const rejectedProviders = await adminService.getRejectedServiceProviders();
+      
+      // Transform all data to match ServiceProvider interface
+      const formattedProviders = [...pendingProviders, ...approvedProviders, ...rejectedProviders].map(provider => ({
+        id: provider.id || provider.user_id || '',
+        businessName: provider.business_name || '',
+        providerName: provider.provider_name || '',
+        email: provider.contact_email || provider.email || '',
+        phone: provider.contact_phone || provider.phone || '',
+        serviceType: provider.service_types || '',
+        location: provider.city ? `${provider.city}, ${provider.province || ''}` : '',
+        registrationDate: provider.created_at || new Date().toISOString(),
+        status: provider.approval_status || 'pending',
+        nicNumber: provider.nic_number || '',
+        nicFrontImage: provider.nic_front_image_url || '',
+        nicBackImage: provider.nic_back_image_url || '',
+        businessRegistrationNumber: provider.business_registration_number || '',
+        businessDescription: provider.business_description || '',
+        profilePicture: provider.profile_picture_url || '',
+        coverPhoto: provider.cover_photo_url || '',
+        userId: provider.user_id || '',
+        bankName: provider.bank_name || '',
+        branchName: provider.branch_name || '',
+        accountNumber: provider.account_number || '',
+        accountOwnerName: provider.account_owner_name || ''
+      }));
+      
+      setServiceProviders(formattedProviders);
+      applyFilters(formattedProviders, searchTerm, filterStatus, filterServiceType, sortField, sortDirection);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error fetching service providers:", error);
       toast.error("Failed to load service providers");
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to map API data to the component's expected format
-  const mapApiDataToServiceProvider = (apiData: any): ServiceProvider => {
-    return {
-      id: apiData.id,
-      businessName: apiData.business_name,
-      providerName: apiData.provider_name,
-      email: apiData.contact_email,
-      phone: apiData.contact_phone,
-      serviceType: apiData.service_types,
-      location: `${apiData.city}, ${apiData.province}`,
-      registrationDate: new Date(apiData.created_at).toLocaleDateString(),
-      status: apiData.approval_status,
-      nicNumber: apiData.nic_number,
-      nicFrontImage: apiData.nic_front_image_url,
-      nicBackImage: apiData.nic_back_image_url,
-      businessRegistrationNumber: apiData.business_registration_number,
-      businessDescription: apiData.business_description,
-      profilePicture: apiData.profile_picture_url,
-      coverPhoto: apiData.cover_photo_url,
-      userId: apiData.user_id,
-      // Map other fields as needed
-    };
-  };
+  // Initial load
+  useEffect(() => {
+    fetchServiceProviders();
+  }, []);
 
-  // Handle provider selection for viewing details
-  const handleViewProvider = (provider: ServiceProvider) => {
-    setSelectedProvider(provider);
-    setIsViewDialogOpen(true);
-  };
-
-  // Handle approval action
-  const handleApproveProvider = async () => {
-    if (!providerToAction) return;
+  // Apply filters, search, and sorting
+  const applyFilters = (
+    providers: ServiceProvider[], 
+    search: string, 
+    status: string, 
+    serviceType: string,
+    field: string,
+    direction: "asc" | "desc"
+  ) => {
+    let filtered = [...providers];
     
-    try {
-      await adminService.approveServiceProvider(providerToAction.id);
-      toast.success("Service provider approved successfully");
-      setIsApproveDialogOpen(false);
-      setProviderToAction(null);
-      
-      // Refresh the data
-      fetchServiceProviders();
-    } catch (error) {
-      console.error("Error approving service provider:", error);
-      toast.error("Failed to approve service provider");
-    }
-  };
-
-  // Handle rejection action
-  const handleRejectProvider = async () => {
-    if (!providerToAction) return;
-    
-    if (!rejectionReason.trim()) {
-      toast.error("Please provide a reason for rejection");
-      return;
+    // Filter by status
+    if (status !== "all") {
+      filtered = filtered.filter(provider => provider.status === status);
     }
     
-    try {
-      await adminService.rejectServiceProvider(providerToAction.id, rejectionReason);
-      toast.success("Service provider rejected successfully");
-      setIsRejectDialogOpen(false);
-      setProviderToAction(null);
-      setRejectionReason("");
-      
-      // Refresh the data
-      fetchServiceProviders();
-    } catch (error) {
-      console.error("Error rejecting service provider:", error);
-      toast.error("Failed to reject service provider");
-    }
-  };
-
-  // Open approval confirmation dialog
-  const openApproveDialog = (provider: ServiceProvider) => {
-    setProviderToAction(provider);
-    setIsApproveDialogOpen(true);
-  };
-
-  // Open rejection dialog
-  const openRejectDialog = (provider: ServiceProvider) => {
-    setProviderToAction(provider);
-    setIsRejectDialogOpen(true);
-  };
-
-  // Filter service providers based on search query and filters
-  const getFilteredProviders = () => {
-    let providers: ServiceProvider[] = [];
-    
-    if (activeTab === "pending") {
-      providers = pendingProviders;
-    } else if (activeTab === "approved") {
-      providers = approvedProviders;
-    } else if (activeTab === "rejected") {
-      providers = rejectedProviders;
+    // Filter by service type
+    if (serviceType !== "all") {
+      filtered = filtered.filter(provider => provider.serviceType === serviceType);
     }
     
-    return providers.filter(provider => {
-      const matchesSearch = searchQuery === "" || 
-        provider.businessName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        provider.providerName.toLowerCase().includes(searchQuery.toLowerCase());
+    // Search term
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(provider => 
+        provider.businessName.toLowerCase().includes(searchLower) ||
+        provider.providerName.toLowerCase().includes(searchLower) ||
+        provider.email.toLowerCase().includes(searchLower) ||
+        provider.location.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Sort the results
+    filtered.sort((a, b) => {
+      // For date fields
+      if (field === "registrationDate") {
+        const dateA = new Date(a.registrationDate).getTime();
+        const dateB = new Date(b.registrationDate).getTime();
+        return direction === "asc" ? dateA - dateB : dateB - dateA;
+      }
       
-      const matchesServiceType = serviceTypeFilter === "all" || 
-        provider.serviceType === serviceTypeFilter;
+      // For string fields
+      const valueA = (a[field as keyof ServiceProvider] as string) || "";
+      const valueB = (b[field as keyof ServiceProvider] as string) || "";
       
-      const matchesLocation = locationFilter === "all" || 
-        provider.location.toLowerCase().includes(locationFilter.toLowerCase());
-      
-      return matchesSearch && matchesServiceType && matchesLocation;
+      return direction === "asc" 
+        ? valueA.localeCompare(valueB)
+        : valueB.localeCompare(valueA);
     });
+    
+    setFilteredProviders(filtered);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
-  // Get paginated providers
-  const getPaginatedProviders = () => {
-    const filteredProviders = getFilteredProviders();
-    const indexOfLastProvider = currentPage * providersPerPage;
-    const indexOfFirstProvider = indexOfLastProvider - providersPerPage;
-    return filteredProviders.slice(indexOfFirstProvider, indexOfLastProvider);
+  // Handle filter changes
+  useEffect(() => {
+    applyFilters(serviceProviders, searchTerm, filterStatus, filterServiceType, sortField, sortDirection);
+  }, [searchTerm, filterStatus, filterServiceType, sortField, sortDirection, itemsPerPage]);
+
+  // Get current page items
+  const getCurrentItems = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProviders.slice(startIndex, endIndex);
   };
 
-  // Calculate total pages
-  const totalPages = Math.ceil(getFilteredProviders().length / providersPerPage);
+  // Handle view details
+  const handleViewDetails = (provider: ServiceProvider) => {
+    setSelectedProvider(provider);
+    setShowDetailsDialog(true);
+  };
 
-  // Pagination controls
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+  // Handle approve provider
+  const handleApprove = async (provider: ServiceProvider) => {
+    try {
+      await adminService.approveServiceProvider(provider.id);
+      
+      // Update local state
+      const updatedProviders = serviceProviders.map(p => 
+        p.id === provider.id ? {...p, status: 'approved'} : p
+      );
+      
+      setServiceProviders(updatedProviders);
+      applyFilters(updatedProviders, searchTerm, filterStatus, filterServiceType, sortField, sortDirection);
+      
+      setShowDetailsDialog(false);
+      toast.success(`${provider.businessName} has been approved`);
+    } catch (error) {
+      console.error("Error approving provider:", error);
+      toast.error("Failed to approve provider");
+    }
+  };
+
+  // Handle reject provider
+  const handleOpenRejectDialog = (provider: ServiceProvider) => {
+    setSelectedProvider(provider);
+    setShowRejectDialog(true);
+    setShowDetailsDialog(false);
+  };
+
+  const handleReject = async () => {
+    if (!selectedProvider || !rejectionReason) return;
+    
+    try {
+      await adminService.rejectServiceProvider(selectedProvider.id, rejectionReason);
+      
+      // Update local state
+      const updatedProviders = serviceProviders.map(p => 
+        p.id === selectedProvider.id ? {...p, status: 'rejected'} : p
+      );
+      
+      setServiceProviders(updatedProviders);
+      applyFilters(updatedProviders, searchTerm, filterStatus, filterServiceType, sortField, sortDirection);
+      
+      setShowRejectDialog(false);
+      setRejectionReason("");
+      toast.success(`${selectedProvider.businessName} has been rejected`);
+    } catch (error) {
+      console.error("Error rejecting provider:", error);
+      toast.error("Failed to reject provider");
+    }
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchServiceProviders();
+    setIsRefreshing(false);
+  };
+
+  // Get service type options
+  const getServiceTypeOptions = () => {
+    const types = new Set<string>();
+    serviceProviders.forEach(provider => {
+      if (provider.serviceType) {
+        types.add(provider.serviceType);
+      }
+    });
+    
+    return Array.from(types).sort();
+  };
+
+  // Render status badge
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <Badge className="bg-green-100 text-green-800 border border-green-200">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge className="bg-red-100 text-red-800 border border-red-200">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
+    }
+  };
+
+  // Render skeleton loaders during loading state
+  const renderSkeletons = () => {
+    return Array(itemsPerPage).fill(0).map((_, index) => (
+      <Card key={index} className="overflow-hidden border border-gray-200">
+        <CardHeader className="p-4 pb-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 items-center">
+              <Skeleton className="h-4 w-4 rounded-full" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+            <div className="flex gap-2 items-center">
+              <Skeleton className="h-4 w-4 rounded-full" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <div className="flex gap-2 items-center">
+              <Skeleton className="h-4 w-4 rounded-full" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="px-4 py-3 bg-gray-50 flex justify-between">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-9 w-20 rounded" />
+        </CardFooter>
+      </Card>
+    ));
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex flex-col space-y-4">
-        <h2 className="text-2xl font-bold">Service Provider Approvals</h2>
-        
-        {/* Tabs */}
-        <div className="flex space-x-2 border-b border-gray-200">
-          <button
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "pending"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-blue-600"
-            }`}
-            onClick={() => {
-              setActiveTab("pending");
-              setCurrentPage(1);
-            }}
-          >
-            Pending
-          </button>
-          <button
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "approved"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-blue-600"
-            }`}
-            onClick={() => {
-              setActiveTab("approved");
-              setCurrentPage(1);
-            }}
-          >
-            Approved
-          </button>
-          <button
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === "rejected"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-blue-600"
-            }`}
-            onClick={() => {
-              setActiveTab("rejected");
-              setCurrentPage(1);
-            }}
-          >
-            Rejected
-          </button>
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Service Provider Approvals</h1>
+          <p className="text-gray-500">Review and manage service provider registrations</p>
         </div>
         
-        {/* Search and filters */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search by business or provider name..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </Button>
+      </div>
+      
+      {/* Filters and search bar */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search providers..." 
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <Select
+          value={filterStatus}
+          onValueChange={setFilterStatus}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <Select
+          value={filterServiceType}
+          onValueChange={setFilterServiceType}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by service type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Service Types</SelectItem>
+            {getServiceTypeOptions().map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <Select
+          value={`${sortField}-${sortDirection}`}
+          onValueChange={(value) => {
+            const [field, direction] = value.split('-');
+            setSortField(field);
+            setSortDirection(direction as "asc" | "desc");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="registrationDate-desc">Newest First</SelectItem>
+            <SelectItem value="registrationDate-asc">Oldest First</SelectItem>
+            <SelectItem value="businessName-asc">Business Name (A-Z)</SelectItem>
+            <SelectItem value="businessName-desc">Business Name (Z-A)</SelectItem>
+            <SelectItem value="location-asc">Location (A-Z)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Count and results summary */}
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-500">
+          Showing {filteredProviders.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProviders.length)} of {filteredProviders.length} providers
+        </p>
+        
+        <Select
+          value={itemsPerPage.toString()}
+          onValueChange={(value) => setItemsPerPage(parseInt(value))}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Items per page" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="6">6 items per page</SelectItem>
+            <SelectItem value="12">12 items per page</SelectItem>
+            <SelectItem value="24">24 items per page</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Tabs for quick filtering */}
+      <Tabs defaultValue="pending" onValueChange={(value) => setFilterStatus(value)}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="approved">Approved</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
+      {/* Service provider cards */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {renderSkeletons()}
+        </div>
+      ) : filteredProviders.length === 0 ? (
+        <div className="bg-gray-50 border rounded-lg p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+            <AlertCircle className="h-6 w-6 text-gray-500" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-gray-900">No providers found</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            We couldn't find any service providers matching your criteria.
+          </p>
+          <div className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterStatus("all");
+                setFilterServiceType("all");
+              }}
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {getCurrentItems().map((provider) => (
+            <Card 
+              key={provider.id} 
+              className={`overflow-hidden border hover:shadow-md transition-all duration-200 ${
+                provider.status === 'pending' ? 'border-yellow-200 hover:border-yellow-300' : 
+                provider.status === 'approved' ? 'border-green-200 hover:border-green-300' : 'border-red-200 hover:border-red-300'
+              }`}
+            >
+              <CardHeader className="p-4 pb-2 flex flex-row justify-between items-start bg-gradient-to-r from-gray-50 to-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-gray-50 flex items-center justify-center">
+                    {provider.profilePicture ? (
+                      <img
+                        src={provider.profilePicture}
+                        alt={provider.providerName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-6 w-6 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold line-clamp-1 text-blue-900">{provider.businessName}</CardTitle>
+                    <CardDescription className="line-clamp-1 flex items-center">
+                      <Tag className="h-3 w-3 mr-1 text-blue-500" />
+                      <span className="text-blue-600 font-medium">{provider.serviceType}</span>
+                    </CardDescription>
+                  </div>
+                </div>
+                {renderStatusBadge(provider.status)}
+              </CardHeader>
+              <CardContent className="p-4 pt-3">
+                <div className="flex flex-col gap-3 text-sm">
+                  <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 transition-colors">
+                    <div className="bg-blue-50 rounded-full p-1.5">
+                      <User className="h-3.5 w-3.5 text-blue-600" />
+                    </div>
+                    <span className="text-gray-700 font-medium">{provider.providerName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 transition-colors">
+                    <div className="bg-green-50 rounded-full p-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-green-600" />
+                    </div>
+                    <span className="text-gray-700">{provider.location || "No location specified"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 transition-colors">
+                    <div className="bg-amber-50 rounded-full p-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                    </div>
+                    <span className="text-gray-700">
+                      {(() => {
+                        try {
+                          const date = new Date(provider.registrationDate);
+                          return isNaN(date.getTime()) 
+                            ? "Registration date unknown" 
+                            : `Registered ${formatDistanceToNow(date, { addSuffix: true })}`;
+                        } catch (error) {
+                          return "Registration date unknown";
+                        }
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="px-4 py-3 bg-gray-50 flex justify-between items-center border-t border-gray-100">
+                <div className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                  ID: {provider.id.slice(0, 8)}...
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    onClick={() => handleViewDetails(provider)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Details
+                  </Button>
+                  
+                  {provider.status === 'pending' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-gray-100">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 shadow-lg">
+                        <DropdownMenuLabel className="text-gray-500 text-xs uppercase tracking-wider">Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="hover:bg-green-50 cursor-pointer" 
+                          onClick={() => handleApprove(provider)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                          <span className="text-green-700 font-medium">Approve</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="hover:bg-red-50 cursor-pointer" 
+                          onClick={() => handleOpenRejectDialog(provider)}
+                        >
+                          <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                          <span className="text-red-700 font-medium">Reject</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+      
+      {/* Pagination */}
+      {filteredProviders.length > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={page}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                className={`w-9 ${currentPage === page ? 'bg-blue-600' : ''}`}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+      
+      {/* Details Dialog */}
+      <ServiceProviderDetailsDialog
+        isOpen={showDetailsDialog}
+        onClose={() => setShowDetailsDialog(false)}
+        provider={selectedProvider}
+        onApprove={handleApprove}
+        onReject={handleOpenRejectDialog}
+      />
+      
+      {/* Reject Confirmation Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Reject Service Provider</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this service provider. 
+              This information will be shared with the provider.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="my-4">
+            <label htmlFor="rejectionReason" className="text-sm font-medium block mb-2">
+              Rejection Reason
+            </label>
+            <textarea
+              id="rejectionReason"
+              className="w-full border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 p-2 h-24"
+              placeholder="Enter the reason for rejection..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
             />
           </div>
           
-          {/* Add filters as needed */}
-        </div>
-        
-        {/* Service provider list */}
-        {isLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading...</span>
-          </div>
-        ) : getPaginatedProviders().length === 0 ? (
-          <div className="py-16 text-center">
-            <FileX className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No service providers found</h3>
-            <p className="mt-2 text-gray-500">
-              {activeTab === "pending"
-                ? "There are no pending service provider applications."
-                : activeTab === "approved"
-                ? "There are no approved service providers."
-                : "There are no rejected service providers."}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-4">
-              {getPaginatedProviders().map((provider) => (
-                <Card key={provider.id} className="overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="flex flex-col md:flex-row">
-                      <div className="flex-1 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
-                            {provider.profilePicture ? (
-                              <img
-                                src={provider.profilePicture}
-                                alt={provider.businessName}
-                                className="h-10 w-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <Building className="h-5 w-5 text-gray-400" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-medium">{provider.businessName}</h3>
-                            <p className="text-sm text-gray-500">{provider.providerName}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-gray-400" />
-                            <span>{provider.serviceType}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <span>{provider.location}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-gray-400" />
-                            <span>{provider.registrationDate}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-50 p-4 flex flex-col md:flex-row md:items-center gap-2 justify-end border-t md:border-t-0 md:border-l border-gray-100">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewProvider(provider)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        
-                        {activeTab === "pending" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-green-500 text-green-600 hover:bg-green-50"
-                              onClick={() => openApproveDialog(provider)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-red-500 text-red-600 hover:bg-red-50"
-                              onClick={() => openRejectDialog(provider)}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center mt-6">
-                <div className="flex gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={page === currentPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePageChange(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      
-      {/* Service Provider Details Dialog */}
-      <ServiceProviderDetailsDialog
-        isOpen={isViewDialogOpen}
-        onClose={() => setIsViewDialogOpen(false)}
-        provider={selectedProvider}
-        onApprove={openApproveDialog}
-        onReject={openRejectDialog}
-        showActions={activeTab === "pending"}
-      />
-      
-      {/* Approve Confirmation Dialog */}
-      <Dialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Approve Service Provider</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to approve this service provider? They will be able to 
-              access the system and create packages once approved.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="font-medium">{providerToAction?.businessName}</p>
-            <p className="text-sm text-gray-500">{providerToAction?.providerName}</p>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsApproveDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleApproveProvider} className="bg-green-600 hover:bg-green-700">
-              Approve Provider
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Reject Dialog */}
-      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reject Service Provider</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this service provider application.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="font-medium">{providerToAction?.businessName}</p>
-            <p className="text-sm text-gray-500 mb-4">{providerToAction?.providerName}</p>
-            
-            <Label htmlFor="rejectionReason">Rejection Reason</Label>
-            <Textarea
-              id="rejectionReason"
-              placeholder="Enter reason for rejection..."
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              className="mt-2"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>Cancel</Button>
             <Button 
-              onClick={handleRejectProvider} 
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleReject}
               disabled={!rejectionReason.trim()}
             >
-              Reject Provider
+              <XCircle className="h-4 w-4 mr-2" />
+              Confirm Rejection
             </Button>
           </DialogFooter>
         </DialogContent>

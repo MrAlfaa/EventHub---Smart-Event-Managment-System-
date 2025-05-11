@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ServiceProvider } from '@/types';
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -30,23 +31,35 @@ export interface SuperAdminCreateData {
   password: string;
 }
 
-// Add these new types
+// Service Provider Profile from API
 export interface ServiceProviderProfile {
   id: string;
-  business_name: string;
-  provider_name: string;
-  email: string;
   user_id: string;
-  contact_email: string;
-  contact_phone: string;
+  provider_name: string;
+  business_name: string;
   nic_number: string;
   business_registration_number: string;
+  business_description: string;
+  contact_email: string;
+  contact_phone: string;
+  address: string;
   city: string;
   province: string;
+  service_locations: string[];
   service_types: string;
+  covered_event_types: string[];
+  profile_picture_url: string;
+  cover_photo_url: string;
+  nic_front_image_url: string;
+  nic_back_image_url: string;
+  slogan: string;
+  bank_name: string;
+  branch_name: string;
+  account_number: string;
+  account_owner_name: string;
   approval_status: string;
   created_at: string;
-  // Add other properties as needed
+  updated_at: string;
 }
 
 export interface ApprovalRejectRequest {
@@ -89,14 +102,40 @@ const adminService = {
 
   // Get approved service providers
   getApprovedServiceProviders: async (): Promise<ServiceProviderProfile[]> => {
-    const response = await adminApi.get('/admin/service-providers/approved');
-    return response.data;
+    try {
+      const response = await adminApi.get('/admin/service-providers/approved');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching approved service providers:', error);
+      if (error instanceof Error && error.message === 'Network Error') {
+        console.error('This may be a CORS issue. Check your backend CORS settings.');
+      }
+      throw error;
+    }
   },
 
   // Get rejected service providers
   getRejectedServiceProviders: async (): Promise<ServiceProviderProfile[]> => {
     const response = await adminApi.get('/admin/service-providers/rejected');
     return response.data;
+  },
+
+  // Get all service providers
+  getAllServiceProviders: async (): Promise<ServiceProviderProfile[]> => {
+    try {
+      // Get all service providers - approved and rejected
+      const approved = await adminService.getApprovedServiceProviders();
+      const rejected = await adminService.getRejectedServiceProviders();
+      
+      // Combine both lists
+      return [...approved, ...rejected];
+    } catch (error: unknown) {
+      console.error('Error fetching all service providers:', error);
+      if (error instanceof Error && error.message === 'Network Error') {
+        console.error('This may be a CORS issue. Check your backend CORS settings.');
+      }
+      throw error;
+    }
   },
 
   // Approve a service provider

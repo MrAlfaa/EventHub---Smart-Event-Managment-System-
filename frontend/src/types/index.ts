@@ -12,50 +12,54 @@ import { ReactNode } from "react";
 
 // Service Provider Types
 export interface ServiceProvider {
-  currency: string;
-  packageName: ReactNode;
-  price: any;
-  packagePrice: any;
   id: string;
   name: string;
-  description: string;
-  slogan?: string; // Added slogan property
-  profileImage: string;
-  coverImage?: string;
-  services: string[];
-  eventTypes: string[];
-  serviceLocations?: string[]; // Added serviceLocations property
-  location: {
-    city: string;
-    address: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
+  businessName: string;
+  description?: string;
+  slogan?: string;
+  profileImage?: string;
+  coverPhoto?: string;
+  serviceType: string[];
+  eventTypes?: string[];
+  serviceLocations?: string[];
+  location: string;
+  email: string;
+  contactNumber: string;
+  nicNumber: string;
+  businessRegNumber?: string;
+  business_description?: string;
+  status: string;
+  nicFrontImage?: string;
+  nicBackImage?: string;
+  eventOrganizerContact?: {
+    name: string;
+    email: string;
+    phone: string;
   };
-  pricing: {
+  // Add additional properties as needed
+  pricing?: {
     minPrice: number;
     maxPrice: number;
     currency: string;
   };
-  rating: number;
-  reviewCount: number;
-  availableDates: string[];
-  bookedDates: string[];
-  capacity: {
+  rating?: number;
+  reviewCount?: number;
+  availableDates?: string[];
+  bookedDates?: string[];
+  capacity?: {
     min: number;
     max: number;
   };
-  contact: {
+  contact?: {
     email: string;
     phone: string;
     website?: string;
   };
-  gallery: {
+  gallery?: {
     images: string[];
     videos?: string[];
   };
-  isNewcomer: boolean;
+  isNewcomer?: boolean;
   packages?: Package[];
 }
 
