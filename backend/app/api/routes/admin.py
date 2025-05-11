@@ -236,3 +236,26 @@ async def get_all_users(
             del user["password"]
     
     return users
+
+@router.get("/admin/stats", response_model=dict)
+async def get_admin_stats(
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Get dashboard statistics for admin"""
+    db = await get_database()
+    
+    # Count total regular users
+    users_count = await db.users.count_documents({"role": "user"})
+    
+    # Count total service providers
+    service_providers_count = await db.users.count_documents({"role": "service_provider"})
+    
+    # Count pending service provider applications
+    pending_providers_count = await db.service_provider_profiles.count_documents({"approval_status": "pending"})
+    
+    # Get stats for recent activities (you can expand this as needed)
+    return {
+        "users_count": users_count,
+        "service_providers_count": service_providers_count,
+        "pending_providers_count": pending_providers_count,
+    }

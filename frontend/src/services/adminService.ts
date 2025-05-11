@@ -31,6 +31,13 @@ export interface SuperAdminCreateData {
   password: string;
 }
 
+// Define the AdminStats interface to match the API response
+export interface AdminStats {
+  users_count: number;
+  service_providers_count: number;
+  pending_providers_count: number;
+}
+
 // Service Provider Profile from API
 export interface ServiceProviderProfile {
   id: string;
@@ -181,7 +188,21 @@ const adminService = {
       }
       throw error;
     }
-  }
+  },
+
+  // Get admin dashboard stats
+  getAdminStats: async (): Promise<AdminStats> => {
+    try {
+      const response = await adminApi.get('/admin/stats');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching admin stats:', error);
+      if (error.message === 'Network Error') {
+        console.error('This may be a CORS issue. Check your backend CORS settings.');
+      }
+      throw error;
+    }
+  },
 };
 
 export default adminService;
