@@ -66,6 +66,23 @@ export interface ApprovalRejectRequest {
   reason?: string;
 }
 
+// Define User interface for admin operations
+export interface AdminUserData {
+  id: string;
+  name: string;
+  email: string;
+  username: string;
+  phone: string;
+  nic_number?: string;
+  address?: string;
+  role: string;
+  profile_image?: string | null;
+  nic_front_image?: string | null;
+  nic_back_image?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Admin service functions
 const adminService = {
   // Check if super admin exists
@@ -150,6 +167,20 @@ const adminService = {
       reason
     });
     return response.data;
+  },
+
+  // Get all regular users
+  getAllUsers: async (): Promise<AdminUserData[]> => {
+    try {
+      const response = await adminApi.get('/admin/users');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      if (error.message === 'Network Error') {
+        console.error('This may be a CORS issue. Check your backend CORS settings.');
+      }
+      throw error;
+    }
   }
 };
 

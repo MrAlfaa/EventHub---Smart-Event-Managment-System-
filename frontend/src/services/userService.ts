@@ -58,6 +58,16 @@ const userService = {
       return false; // Default to false on error
     }
   },
+
+  // Update user profile with documents
+  updateUserProfileWithDocuments: async (formData: FormData): Promise<User> => {
+    const response = await userApi.post('/users/update-profile-with-documents', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 export default userService;

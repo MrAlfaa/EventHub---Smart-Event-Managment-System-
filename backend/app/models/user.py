@@ -51,6 +51,10 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     profile_image: Optional[str] = None
+    nic_number: Optional[str] = None
+    nic_front_image: Optional[str] = None
+    nic_back_image: Optional[str] = None
+    address: Optional[str] = None
     
     model_config = {
         "populate_by_name": True,
@@ -62,6 +66,10 @@ class UserUpdate(BaseModel):
 class UserInDB(UserBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     profile_image: Optional[str] = None
+    nic_number: Optional[str] = None
+    nic_front_image: Optional[str] = None
+    nic_back_image: Optional[str] = None
+    address: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

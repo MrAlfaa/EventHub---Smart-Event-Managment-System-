@@ -212,3 +212,27 @@ async def reject_service_provider(
     )
     
     return {"message": "Service provider rejected successfully"}
+
+@router.get("/admin/users", response_model=List[dict])
+async def get_all_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_admin: UserInDB = Depends(get_current_admin_user)
+):
+    """Get all regular users"""
+    db = await get_database()
+    
+    # Find all users with role="user"
+    cursor = db.users.find({"role": "user"}).skip(skip).limit(limit)
+    users = await cursor.to_list(length=limit)
+    
+    # Convert ObjectIds to strings for JSON serialization
+    for user in users:
+        user["id"] = str(user["_id"])
+        del user["_id"]
+        
+        # Remove password hash for security
+        if "password" in user:
+            del user["password"]
+    
+    return users
