@@ -9,3 +9,6 @@ class SuperAdminCreate(BaseModel):
     
 class SuperAdminCheck(BaseModel):
     exists: bool
+
+class ServiceProviderApprovalAction(BaseModel):
+    reason: Optional[str] = None

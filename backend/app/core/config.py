@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
     
-    # CORS
+    # CORS - Fix by ensuring these include your frontend URL
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
     
     # API settings

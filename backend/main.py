@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.api.routes import users, auth, providers, admin
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
-from app.api.routes import auth, users, providers, admin
 
-app = FastAPI()
+app = FastAPI(title="EventHub API")
 
-# Configure CORS
+# Configure CORS with explicit origin specification
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -24,7 +24,7 @@ async def startup_db_client():
 async def shutdown_db_client():
     await close_mongo_connection()
 
-# Include API routes
+# Include routers with prefix
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(providers.router, prefix=settings.API_V1_STR)
