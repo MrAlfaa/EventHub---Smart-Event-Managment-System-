@@ -36,7 +36,13 @@ export interface ServiceProvider {
     email: string;
     phone: string;
   };
-  // Add additional properties as needed
+  // Add financial information fields
+  bankName?: string;
+  branchName?: string;
+  accountNumber?: string;
+  accountOwnerName?: string;
+  registrationDate?: string;
+  // Other existing fields
   pricing?: {
     minPrice: number;
     maxPrice: number;

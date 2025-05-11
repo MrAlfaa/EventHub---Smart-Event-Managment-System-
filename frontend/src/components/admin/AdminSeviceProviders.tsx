@@ -56,15 +56,23 @@ const AdminServiceProviders = () => {
           businessRegNumber: provider.business_registration_number || '',
           location: provider.city || '',
           serviceType: provider.service_types ? provider.service_types.split(',') : [],
-          status: 'Active',
+          // Keep the original approval_status value for dialog component
+          status: provider.approval_status || 'pending',
           profileImage: provider.profile_picture_url || '',
           coverPhoto: provider.cover_photo_url || '',
           nicFrontImage: provider.nic_front_image_url || '',
           nicBackImage: provider.nic_back_image_url || '',
           business_description: provider.business_description || '',
-          serviceLocations: [],
-          coveredEventTypes: [],
-          slogan: '',
+          serviceLocations: provider.service_locations || [],
+          coveredEventTypes: provider.covered_event_types || [],
+          slogan: provider.slogan || '',
+          // Include financial information
+          bankName: provider.bank_name || '',
+          branchName: provider.branch_name || '',
+          accountNumber: provider.account_number || '',
+          accountOwnerName: provider.account_owner_name || '',
+          // Registration date
+          registrationDate: provider.created_at || new Date().toISOString(),
           // Adding event organizer contact info with defaults in case it's missing
           eventOrganizerContact: {
             name: provider.provider_name || '',
