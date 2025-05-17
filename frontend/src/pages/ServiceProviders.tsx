@@ -2,12 +2,12 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/AppProvider";
 import { Layout } from "@/components/layout/Layout";
 import { useEffect, useState } from "react";
-import { serviceProviders } from "@/data/mockData";
 import { ServiceProvider } from "@/types";
 import { ServiceProviderCard } from "@/components/service-providers/ServiceProviderCard";
 import { FilterSidebar } from "@/components/service-providers/FilterSidebar";
-import { Search, Filter as FilterIcon, X } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { Search, Filter as FilterIcon, Loader } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import providerService from "@/services/providerService";
 import {
   Select,
   SelectContent,
@@ -19,80 +19,63 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const ServiceProviders = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { filter, updateFilter, clearFilter } = useApp();
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("rating");
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const applyFilters = () => {
-    let filtered = [...serviceProviders];
-
-    if (searchTerm) {
-      filtered = filtered.filter((provider) =>
-        provider.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const fetchProviders = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Extract only the filters we want to implement now
+      const activeFilters = {
+        eventType: filter.eventType,
+        services: filter.services,
+        location: filter.location
+      };
+      
+      // Fetch approved providers from the backend
+      const data = await providerService.getApprovedProviders(activeFilters);
+      
+      // Apply client-side search filter
+      let filteredProviders = [...data];
+      
+      if (searchTerm) {
+        filteredProviders = filteredProviders.filter((provider) =>
+          provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          provider.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      
+      // Apply sorting
+      if (sortOption === "rating") {
+        filteredProviders.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      } else if (sortOption === "price_low") {
+        filteredProviders.sort((a, b) => 
+          (a.pricing?.minPrice || 0) - (b.pricing?.minPrice || 0)
+        );
+      } else if (sortOption === "price_high") {
+        filteredProviders.sort((a, b) => 
+          (b.pricing?.maxPrice || 0) - (a.pricing?.maxPrice || 0)
+        );
+      } else if (sortOption === "reviews") {
+        filteredProviders.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0));
+      }
+      
+      setProviders(filteredProviders);
+    } catch (err) {
+      console.error('Error fetching service providers:', err);
+      setError('Failed to load service providers. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (filter.eventType) {
-      filtered = filtered.filter((provider) =>
-        provider.eventTypes.includes(filter.eventType!)
-      );
-    }
-
-    if (filter.services && filter.services.length > 0) {
-      filtered = filtered.filter((provider) =>
-        filter.services.some((service) => provider.services.includes(service))
-      );
-    }
-
-    if (filter.location) {
-      filtered = filtered.filter(
-        (provider) =>
-          provider.location.city
-            .toLowerCase()
-            .includes(filter.location!.toLowerCase()) ||
-          provider.location.address
-            .toLowerCase()
-            .includes(filter.location!.toLowerCase())
-      );
-    }
-
-    if (filter.date) {
-      filtered = filtered.filter((provider) =>
-        provider.availableDates.some(
-          (date) =>
-            new Date(date).toDateString() ===
-            filter.date!.toDateString()
-        )
-      );
-    }
-
-    filtered = filtered.filter(
-      (provider) =>
-        provider.pricing.maxPrice >= filter.budgetRange.min &&
-        provider.pricing.minPrice <= filter.budgetRange.max
-    );
-
-    filtered = filtered.filter(
-      (provider) =>
-        provider.capacity.max >= filter.crowdRange.min &&
-        provider.capacity.min <= filter.crowdRange.max
-    );
-
-    // Apply sorting
-    if (sortOption === "rating") {
-      filtered.sort((a, b) => b.rating - a.rating);
-    } else if (sortOption === "price_low") {
-      filtered.sort((a, b) => a.pricing.minPrice - b.pricing.minPrice);
-    } else if (sortOption === "price_high") {
-      filtered.sort((a, b) => b.pricing.maxPrice - a.pricing.maxPrice);
-    } else if (sortOption === "reviews") {
-      filtered.sort((a, b) => b.reviewCount - a.reviewCount);
-    }
-
-    setProviders(filtered);
   };
 
   // Parse query params on initial load
@@ -104,20 +87,24 @@ const ServiceProviders = () => {
       updateFilter({ services: [serviceParam] });
     }
     
-    // Otherwise use existing filter
-    applyFilters();
+    // Initially fetch providers
+    fetchProviders();
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  // Re-filter when filters or sort option changes
+  // Re-fetch when filters or sort option changes
   useEffect(() => {
-    applyFilters();
+    fetchProviders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, searchTerm, sortOption]);
+  }, [filter.eventType, filter.services, filter.location, searchTerm, sortOption]);
 
   const toggleFilters = () => {
     setFiltersVisible(!filtersVisible);
+  };
+
+  const handleViewProvider = (providerId: string) => {
+    navigate(`/service-providers/${providerId}`);
   };
 
   return (
@@ -206,7 +193,22 @@ const ServiceProviders = () => {
               </p>
             </div>
 
-            {providers.length > 0 ? (
+            {isLoading ? (
+              <div className="flex h-40 sm:h-60 flex-col items-center justify-center">
+                <Loader className="h-8 w-8 animate-spin text-blue-600" />
+                <p className="mt-4 text-sm text-gray-600">Loading service providers...</p>
+              </div>
+            ) : error ? (
+              <div className="flex h-40 sm:h-60 flex-col items-center justify-center rounded-lg border border-dashed border-red-300 bg-red-50 p-4 sm:p-8 text-center">
+                <p className="text-base sm:text-lg font-medium text-red-600">{error}</p>
+                <Button
+                  onClick={fetchProviders}
+                  className="mt-4 text-xs sm:text-sm h-8 sm:h-10"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : providers.length > 0 ? (
               <div className="grid gap-3 sm:gap-4 md:gap-6 lg:gap-8 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3">
                 {providers.map((provider) => (
                   <ServiceProviderCard key={provider.id} provider={provider} />

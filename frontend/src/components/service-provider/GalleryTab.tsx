@@ -1,158 +1,95 @@
-import { ServiceProvider } from "@/types";
-import { ImageIcon, Video, Expand, X } from "lucide-react";
-import { useState, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 interface GalleryTabProps {
-  provider: ServiceProvider;
+  images: string[];
 }
 
-export const GalleryTab = ({ provider }: GalleryTabProps) => {
+export const GalleryTab = ({ images }: GalleryTabProps) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [galleryImages, setGalleryImages] = useState<string[]>(provider.gallery.images);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const openImageViewer = (image: string) => {
+  const openLightbox = (image: string, index: number) => {
     setSelectedImage(image);
+    setCurrentIndex(index);
   };
 
-  const closeImageViewer = () => {
+  const closeLightbox = () => {
     setSelectedImage(null);
   };
-  
-  // Function to handle the upload button click
-  const handleUploadClick = () => {
-    // Trigger the hidden file input
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-  
-  // Function to handle file selection
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    // Process each selected file
-    Array.from(files).forEach(file => {
-      // Validate file is an image
-      if (!file.type.startsWith('image/')) {
-        toast.error(`${file.name} is not an image file`);
-        return;
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} exceeds 5MB size limit`);
-        return;
-      }
-      
-      // Create a URL for the selected image
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          // Add new image to gallery
-          setGalleryImages(prev => [...prev, e.target!.result as string]);
-          toast.success(`${file.name} uploaded successfully`);
-        }
-      };
-      reader.onerror = () => {
-        toast.error(`Failed to read ${file.name}`);
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    // Reset file input to allow selecting the same files again
-    if (event.target) {
-      event.target.value = '';
-    }
-  };
-  
-  // Function to remove an image from gallery
-  const handleRemoveImage = (index: number) => {
-    setGalleryImages(prev => prev.filter((_, i) => i !== index));
-    toast.success("Image removed from gallery");
-  };
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+    setSelectedImage(images[currentIndex === 0 ? images.length - 1 : currentIndex - 1])
+  }
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+    setSelectedImage(images[currentIndex === images.length - 1 ? 0 : currentIndex + 1])
+  }
 
   return (
-    <div className="rounded-lg border bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Gallery</h2>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center">
-            <ImageIcon className="mr-1 h-4 w-4 text-gray-500" />
-            <span className="text-sm">{galleryImages.length} Photos</span>
+    <Card>
+      <CardContent className="p-4 sm:p-6">
+        {images.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 sm:h-60 border border-dashed border-gray-200 rounded-md bg-gray-50">
+            <p className="text-gray-500 text-center">No gallery images available</p>
           </div>
-          {provider.gallery.videos && (
-            <div className="flex items-center">
-              <Video className="mr-1 h-4 w-4 text-gray-500" />
-              <span className="text-sm">{provider.gallery.videos.length} Videos</span>
-            </div>
-          )}
-          
-          {/* Hidden file input */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-          />
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3">
-        {galleryImages.map((image, index) => (
-          <div 
-            key={index} 
-            className="group aspect-square overflow-hidden rounded-lg relative cursor-pointer"
-          >
-            <img
-              src={image}
-              alt={`Gallery image ${index + 1}`}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              onClick={() => openImageViewer(image)}
-            />
-            <div className="absolute inset-0 bg-black bg-opacity-0 flex items-center justify-center transition-all duration-300 group-hover:bg-opacity-30">
-              <Expand className="text-white opacity-0 transform scale-75 transition-all duration-300 group-hover:opacity-100 group-hover:scale-100" />
-            </div>
-            
-            {/* Remove image button */}
-            <button
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveImage(index);
-              }}
-              aria-label="Remove image"
-            >
-              <X className="h-4 w-4" />
-            </button>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+            {images.map((image, index) => (
+              <Dialog key={index}>
+                <DialogTrigger asChild>
+                  <div 
+                    className="aspect-square overflow-hidden rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => openLightbox(image, index)}
+                  >
+                    <img 
+                      src={image} 
+                      alt={`Gallery image ${index + 1}`} 
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl p-0 bg-transparent border-none">
+                  <div className="relative flex items-center justify-center">
+                    <button 
+                      onClick={goToPrevious} 
+                      className="absolute left-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      aria-label="Previous image"
+                      title="Previous image"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    <img 
+                      src={images[currentIndex]} 
+                      alt={`Gallery image ${currentIndex + 1}`} 
+                      className="max-h-[80vh] max-w-full rounded-lg"
+                    />
+                    <button 
+                      onClick={goToNext} 
+                      className="absolute right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      aria-label="Next image"
+                      title="Next image"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                    <button 
+                      onClick={closeLightbox} 
+                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      aria-label="Close lightbox"
+                      title="Close lightbox"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            ))}
           </div>
-        ))}
-        {provider.gallery.videos?.map((video, index) => (
-          <div key={`video-${index}`} className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-            <div className="flex h-full items-center justify-center">
-              <Video className="h-10 w-10 text-blue-500" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Dialog open={!!selectedImage} onOpenChange={() => closeImageViewer()}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden bg-transparent border-none">
-          {selectedImage && (
-            <img
-              src={selectedImage}
-              alt="Gallery image"
-              className="w-full h-full object-contain"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
+        )}
+      </CardContent>
+    </Card>
+  )};

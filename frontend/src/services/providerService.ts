@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -86,6 +86,61 @@ const providerService = {
   deleteProviderCard: async (cardId: string) => {
     const response = await providerApi.delete(`/providers/cards/${cardId}`);
     return response.data;
+  },
+  
+  // Add this new function to fetch approved service providers
+  getApprovedProviders: async (filters: { eventType?: string; services?: string[]; location?: string } = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // Add filters to query params if they exist
+      if (filters.eventType) queryParams.append('eventType', filters.eventType);
+      if (filters.services && filters.services.length) queryParams.append('services', filters.services.join(','));
+      if (filters.location) queryParams.append('location', filters.location);
+      
+      console.log(`Fetching providers with URL: ${API_URL}/providers/approved?${queryParams.toString()}`);
+      
+      const response = await providerApi.get(`/providers/approved?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching approved providers:', error);
+      // Properly type the error as AxiosError
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
+  },
+  
+  // Add this new function to get provider details by ID
+  getProviderById: async (id: string) => {
+    try {
+      const response = await providerApi.get(`/providers/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching provider details:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
+  },
+
+  // Add this function to get provider gallery by ID
+  getProviderGallery: async (id: string) => {
+    try {
+      const response = await providerApi.get(`/providers/${id}/gallery`);
+      return response.data.images || [];
+    } catch (error) {
+      console.error('Error fetching provider gallery:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
   }
 };
 
