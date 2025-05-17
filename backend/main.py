@@ -24,14 +24,12 @@ async def startup_db_client():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     await close_mongo_connection()
-
 # Include routers with prefix
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
-app.include_router(providers.router, prefix=settings.API_V1_STR)
+app.include_router(providers.router, prefix=settings.API_V1_STR)  # Make sure this line exists
 app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(promotions.router, prefix=settings.API_V1_STR)
-
 @app.get("/")
 async def root():
     return {"message": "Welcome to EventHub API"}

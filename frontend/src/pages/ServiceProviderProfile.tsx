@@ -2,31 +2,35 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { serviceProviders } from "@/data/mockData";
 import { ServiceProvider, Review } from "@/types";
 import { useApp } from "@/providers/AppProvider";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Edit, Settings, BarChart } from "lucide-react";
+import { AlertCircle, Loader } from "lucide-react";
+import providerService from "@/services/providerService";
 
-// Imported components
-import { ProfileHeader } from "@/components/service-provider/ProfileHeader";
-import { AboutTab } from "@/components/service-provider/AboutTab";
-import { GalleryTab } from "@/components/service-provider/GalleryTab";
-import { ReviewsTab } from "@/components/service-provider/ReviewsTab";
-import { AvailabilityTab } from "@/components/service-provider/AvailabilityTab";
-import { ContactInfo } from "@/components/service-provider/ContactInfo";
-import { PackagesTab } from "@/components/service-provider/PackagesTab";
+// Import all the components we created
+import { 
+  AboutTab, 
+  AvailabilityTab, 
+  ContactInfo, 
+  GalleryTab, 
+  PackagesTab, 
+  ProfileHeader, 
+  ReviewsTab 
+} from "@/components/service-provider";
 
 const ServiceProviderProfile = () => {
   const { id } = useParams<{ id: string }>();
   const [provider, setProvider] = useState<ServiceProvider | null>(null);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { addToCart, user } = useApp();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
 
-  // Mock reviews
+  // Mock reviews - will be replaced with real data later
   const mockReviews: Review[] = [
     {
       id: "1",
@@ -46,32 +50,42 @@ const ServiceProviderProfile = () => {
       comment: "Great experience overall. Very professional team and good value for money.",
       date: "2025-02-28",
     },
-    {
-      id: "3",
-      userId: "103",
-      serviceProviderId: id || "",
-      userName: "Michael Brown",
-      rating: 5,
-      comment: "Exceeded our expectations! The team went above and beyond to make our event special.",
-      date: "2025-02-10",
-    },
   ];
 
   useEffect(() => {
-    // Simulate API fetch
-    setLoading(true);
-    const foundProvider = serviceProviders.find(p => p.id === id);
-    
-    if (foundProvider) {
-      setProvider(foundProvider);
+    const fetchProviderData = async () => {
+      if (!id) return;
       
-      // Check if this is the service provider viewing their own profile
-      if (user?.role === 'service_provider' && user?.id === id) {
-        setIsOwnProfile(true);
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch provider details
+        const providerData = await providerService.getProviderById(id);
+        setProvider(providerData);
+        
+        // Check if this is the service provider viewing their own profile
+        if (user?.role === 'service_provider' && user?.id === id) {
+          setIsOwnProfile(true);
+        }
+        
+        // Fetch provider gallery
+        try {
+          const galleryData = await providerService.getProviderGallery(id);
+          setGalleryImages(galleryData);
+        } catch (galleryError) {
+          console.error("Error fetching gallery:", galleryError);
+          // Don't set main error - just log gallery error
+        }
+      } catch (err) {
+        console.error("Error fetching provider details:", err);
+        setError("Failed to load service provider details.");
+      } finally {
+        setLoading(false);
       }
-    }
+    };
     
-    setLoading(false);
+    fetchProviderData();
   }, [id, user]);
 
   const handleAddToCart = () => {
@@ -101,8 +115,21 @@ const ServiceProviderProfile = () => {
     return (
       <Layout>
         <div className="container mx-auto py-16 text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-300 border-t-blue-600 mx-auto"></div>
+          <Loader className="h-12 w-12 animate-spin mx-auto text-blue-600" />
           <p className="mt-4">Loading service provider...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto py-16 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-700">Error loading service provider</h2>
+          <p className="mt-2 text-gray-500">{error}</p>
+          <Button className="mt-4" onClick={() => window.history.back()}>Go Back</Button>
         </div>
       </Layout>
     );
@@ -147,7 +174,7 @@ const ServiceProviderProfile = () => {
               </TabsContent>
               
               <TabsContent value="gallery" className="mt-4 sm:mt-6">
-                <GalleryTab provider={provider} />
+                <GalleryTab images={galleryImages} />
               </TabsContent>
               
               <TabsContent value="packages" className="mt-4 sm:mt-6">

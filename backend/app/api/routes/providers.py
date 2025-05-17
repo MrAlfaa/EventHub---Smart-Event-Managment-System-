@@ -944,6 +944,7 @@ async def delete_provider_package(
     return {"message": "Package deleted successfully"}
 
 @router.post("/providers/packages/{package_id}/images", response_model=dict)
+@router.post("/providers/packages/{package_id}/images", response_model=dict)
 async def upload_package_images(
     package_id: str,
     images: List[UploadFile] = File(...),
@@ -995,4 +996,239 @@ async def upload_package_images(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error uploading images: {str(e)}"
+        )
+
+
+@router.get("/providers/approved", response_model=list)
+@router.get("/providers/approved", response_model=list)
+async def get_approved_service_providers(
+    eventType: Optional[str] = None,
+    services: Optional[str] = None,
+    location: Optional[str] = None
+):
+    """Get all approved service providers with optional filtering"""
+    db = await get_database()
+    
+    # Base query - get all service providers that are approved
+    query = {
+        "role": "service_provider",
+        "approval_status": "approved"
+    }
+    
+    # Add filters if provided
+    if eventType:
+        query["covered_event_types"] = {"$in": [eventType]}
+    
+    if services:
+        service_list = services.split(',')
+        query["service_types"] = {"$in": service_list}
+    
+    if location:
+        # Search for location in any of the service_locations or city/province fields
+        location_terms = location.lower()
+        query["$or"] = [
+            {"service_locations": {"$regex": location_terms, "$options": "i"}},
+            {"city": {"$regex": location_terms, "$options": "i"}},
+            {"province": {"$regex": location_terms, "$options": "i"}}
+        ]
+    
+    # Get providers with approval_status = approved
+    cursor = db.users.find({"role": "service_provider", "approval_status": "approved"})
+    providers = await cursor.to_list(length=100)
+    
+    # For each provider, get their profile data and merge
+    result = []
+    for provider in providers:
+        provider_id = str(provider["_id"])
+        profile = await db.service_provider_profiles.find_one({"user_id": provider_id})
+        
+        if profile:
+            # Convert ObjectId to string
+            if "_id" in provider:
+                provider["id"] = str(provider["_id"])
+                del provider["_id"]
+            
+            # Remove password
+            if "password" in provider:
+                del provider["password"]
+            
+            # Merge user data with profile data
+            provider_data = {**provider}
+            
+            # Add profile data that we want to expose
+            if profile.get("profile_picture_url"):
+                provider_data["profileImage"] = profile["profile_picture_url"]
+            
+            if profile.get("cover_photo_url"):
+                provider_data["coverImage"] = profile["cover_photo_url"]
+            
+            if profile.get("service_locations"):
+                provider_data["serviceLocations"] = profile["service_locations"]
+            
+            if profile.get("service_types"):
+                provider_data["serviceType"] = profile["service_types"].split(',')
+            
+            if profile.get("covered_event_types"):
+                provider_data["eventTypes"] = profile["covered_event_types"]
+            
+            if profile.get("slogan"):
+                provider_data["slogan"] = profile["slogan"]
+            
+            # Location information
+            location_parts = []
+            if profile.get("city"):
+                location_parts.append(profile["city"])
+            if profile.get("province"):
+                location_parts.append(profile["province"])
+            
+            if location_parts:
+                provider_data["location"] = ", ".join(location_parts)
+            
+            # Set as newcomer if created within last 30 days
+            if "created_at" in provider:
+                from datetime import datetime, timedelta
+                created_date = provider["created_at"]
+                if isinstance(created_date, datetime) and (datetime.utcnow() - created_date) < timedelta(days=30):
+                    provider_data["isNewcomer"] = True
+            
+            # Add default values for UI
+            provider_data["rating"] = 0  # Default to 0, would be calculated from reviews
+            provider_data["reviewCount"] = 0  # Default to 0, would be calculated from reviews
+            
+            result.append(provider_data)
+    
+    return result;
+
+
+from bson.errors import InvalidId
+from bson import ObjectId
+
+@router.get("/providers/{provider_id}", response_model=dict)
+async def get_provider_by_id(provider_id: str):
+    """Get service provider details by ID"""
+    db = await get_database()
+    
+    try:
+        # Find the provider by ID
+        provider = await db.users.find_one({"_id": ObjectId(provider_id), "role": "service_provider"})
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found"
+            )
+        
+        # Check if provider is approved
+        if provider.get("approval_status") != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Service provider is not approved"
+            )
+        
+        # Get provider profile
+        profile = await db.service_provider_profiles.find_one({"user_id": str(provider["_id"])})
+        
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider profile not found"
+            )
+        
+        # Convert ObjectId to string
+        if "_id" in provider:
+            provider["id"] = str(provider["_id"])
+            del provider["_id"]
+        
+        # Remove password
+        if "password" in provider:
+            del provider["password"]
+        
+        # Merge user data with profile data
+        provider_data = {**provider}
+        
+        # Add profile data
+        if profile.get("profile_picture_url"):
+            provider_data["profileImage"] = profile["profile_picture_url"]
+        
+        if profile.get("cover_photo_url"):
+            provider_data["coverImage"] = profile["cover_photo_url"]
+        
+        if profile.get("service_locations"):
+            provider_data["serviceLocations"] = profile["service_locations"]
+        
+        if profile.get("service_types"):
+            provider_data["serviceType"] = profile["service_types"].split(',')
+        
+        if profile.get("covered_event_types"):
+            provider_data["eventTypes"] = profile["covered_event_types"]
+        
+        if profile.get("slogan"):
+            provider_data["slogan"] = profile["slogan"]
+        
+        if profile.get("business_description"):
+            provider_data["description"] = profile["business_description"]
+        
+        if profile.get("business_name"):
+            provider_data["businessName"] = profile["business_name"]
+        
+        # Contact information
+        provider_data["contact"] = {
+            "email": profile.get("contact_email", provider.get("email", "")),
+            "phone": profile.get("contact_phone", provider.get("phone", ""))
+        }
+        
+        # Location information
+        location_parts = []
+        if profile.get("city"):
+            location_parts.append(profile["city"])
+        if profile.get("province"):
+            location_parts.append(profile["province"])
+        
+        if location_parts:
+            provider_data["location"] = {
+                "city": profile.get("city", ""),
+                "province": profile.get("province", ""),
+                "full": ", ".join(location_parts)
+            }
+        
+        # Add other details
+        provider_data["rating"] = 0  # Default to 0, would be calculated from reviews
+        provider_data["reviewCount"] = 0  # Default to 0, would be calculated from reviews
+        
+        return provider_data
+    
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
+        )
+
+
+@router.get("/providers/{provider_id}/gallery", response_model=dict)
+async def get_provider_gallery(provider_id: str):
+    """Get service provider gallery images"""
+    db = await get_database()
+    
+    try:
+        # Find the provider by ID
+        provider = await db.users.find_one({"_id": ObjectId(provider_id), "role": "service_provider"})
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found"
+            )
+        
+        # Get provider gallery
+        gallery = await db.provider_galleries.find_one({"provider_id": str(provider["_id"])})
+        
+        if gallery:
+            return {"images": gallery.get("images", [])}
+        
+        return {"images": []}
+    
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
         )
