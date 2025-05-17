@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -22,6 +22,40 @@ providerApi.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+// Add this interface
+export interface ServiceProvider {
+  id: string;
+  name: string;
+  businessName: string;
+  description?: string;
+  slogan?: string;
+  profileImage?: string;
+  coverPhoto?: string;
+  serviceType: string[];
+  eventTypes?: string[];
+  serviceLocations?: string[];
+  location: string | {
+    city: string;
+    address: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  };
+  email: string;
+  contactNumber: string;
+  nicNumber?: string;
+  businessRegNumber?: string;
+  business_description?: string;
+  status: string;
+  contact?: {
+    email: string;
+    phone: string;
+    website?: string;
+  };
+  // Add other required fields
+}
 
 // Provider service functions
 const providerService = {
@@ -113,8 +147,8 @@ const providerService = {
     }
   },
   
-  // Add this new function to get provider details by ID
-  getProviderById: async (id: string) => {
+  // Get provider by ID 
+  getProviderById: async (id: string): Promise<ServiceProvider> => {
     try {
       const response = await providerApi.get(`/providers/${id}`);
       return response.data;
@@ -128,8 +162,8 @@ const providerService = {
     }
   },
 
-  // Add this function to get provider gallery by ID
-  getProviderGallery: async (id: string) => {
+  // Get provider gallery
+  getProviderGallery: async (id: string): Promise<string[]> => {
     try {
       const response = await providerApi.get(`/providers/${id}/gallery`);
       return response.data.images || [];

@@ -3,169 +3,155 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SearchIcon, Send, Phone, Video, MoreVertical, PaperclipIcon, SmileIcon } from "lucide-react";
+import { SearchIcon, Send, Phone, Video, MoreVertical, MessageSquare } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// Mock chat contacts data
-const mockContacts = [
-  {
-    id: 1,
-    name: "Event Planner Pro",
-    lastMessage: "Your event details have been updated.",
-    time: "10:30 AM",
-    unread: 2,
-    avatar: "https://ui-avatars.com/api/?name=Event+Planner&background=random",
-    online: true,
-  },
-  {
-    id: 2,
-    name: "DJ Services Ltd",
-    lastMessage: "Looking forward to your event!",
-    time: "Yesterday",
-    unread: 0,
-    avatar: "https://ui-avatars.com/api/?name=DJ+Services&background=random",
-    online: false,
-  },
-  {
-    id: 3,
-    name: "Photography Services",
-    lastMessage: "We've sent you the photo package options.",
-    time: "2 days ago",
-    unread: 0,
-    avatar: "https://ui-avatars.com/api/?name=Photography+Services&background=random",
-    online: true,
-  },
-  {
-    id: 4,
-    name: "Catering Delights",
-    lastMessage: "Do you have any dietary requirements?",
-    time: "3 days ago",
-    unread: 1,
-    avatar: "https://ui-avatars.com/api/?name=Catering+Delights&background=random",
-    online: false,
-  },
-  {
-    id: 5,
-    name: "Venue Support",
-    lastMessage: "The venue is confirmed for your date.",
-    time: "1 week ago",
-    unread: 0,
-    avatar: "https://ui-avatars.com/api/?name=Venue+Support&background=random",
-    online: true,
-  }
-];
-
-// Mock messages data for the selected contact
-const mockMessages = [
-  {
-    id: 1,
-    senderId: 1,
-    text: "Hi there! How can I help you with your upcoming event?",
-    time: "10:15 AM",
-    status: "read",
-  },
-  {
-    id: 2,
-    senderId: "user",
-    text: "Hi! I'm just checking on the details for my event next month.",
-    time: "10:18 AM",
-    status: "read",
-  },
-  {
-    id: 3,
-    senderId: 1,
-    text: "Of course! Your wedding reception is scheduled for May 15th at Riverside Gardens. We have everything set up according to your requirements.",
-    time: "10:20 AM",
-    status: "read",
-  },
-  {
-    id: 4,
-    senderId: "user",
-    text: "Great! Will there be a chance to visit the venue before the event?",
-    time: "10:22 AM",
-    status: "read",
-  },
-  {
-    id: 5,
-    senderId: 1,
-    text: "Absolutely! We can arrange a site visit anytime next week. Would Wednesday at 2 PM work for you?",
-    time: "10:25 AM",
-    status: "read",
-  },
-  {
-    id: 6,
-    senderId: "user",
-    text: "Wednesday works perfectly. I'll make sure to be there on time.",
-    time: "10:28 AM",
-    status: "read",
-  },
-  {
-    id: 7,
-    senderId: 1,
-    text: "Your event details have been updated. Looking forward to seeing you on Wednesday!",
-    time: "10:30 AM",
-    status: "delivered",
-  }
-];
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuthStore } from "@/store/useAuthStore";
+import chatService, { ChatMessage, ChatConversation } from "@/services/chatService";
+import { toast } from "sonner";
 
 export const ChatTab = () => {
-  const [contacts, setContacts] = useState(mockContacts);
+  const { user } = useAuthStore();
+  const [contacts, setContacts] = useState<ChatConversation[]>([]);
   const [search, setSearch] = useState("");
-  const [activeContactId, setActiveContactId] = useState(mockContacts[0].id);
-  const [messages, setMessages] = useState(mockMessages);
+  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Filter contacts based on search input
-  const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Fetch conversations on component mount
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setLoading(true);
+        const conversations = await chatService.getConversations();
+        setContacts(conversations);
+        
+        // Set active contact to first conversation if available
+        if (conversations.length > 0 && !activeContactId) {
+          setActiveContactId(conversations[0].contact_id);
+        }
+      } catch (error) {
+        console.error("Error fetching conversations:", error);
+        toast.error("Failed to load conversations");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Get the active contact
-  const activeContact = contacts.find(contact => contact.id === activeContactId);
+    fetchConversations();
+    
+    // Set up polling for new messages every 10 seconds
+    const intervalId = setInterval(fetchConversations, 10000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Fetch messages when active contact changes
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!activeContactId) return;
+      
+      try {
+        const messageData = await chatService.getMessages(activeContactId);
+        setMessages(messageData);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        toast.error("Failed to load messages");
+      }
+    };
+
+    fetchMessages();
+  }, [activeContactId]);
 
   // Scroll to bottom of messages when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Filter contacts based on search input
+  const filteredContacts = contacts.filter(contact =>
+    contact.contact_name.toLowerCase().includes(search.toLowerCase()) ||
+    (contact.contact_business_name && 
+     contact.contact_business_name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  // Get the active contact
+  const activeContact = contacts.find(contact => contact.contact_id === activeContactId);
+
   // Handle sending a new message
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeContactId || !user) return;
     
-    const newMsg = {
-      id: messages.length + 1,
-      senderId: "user",
-      text: newMessage,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "sent",
-    };
-    
-    setMessages([...messages, newMsg]);
-    setNewMessage("");
-    
-    // Simulate a response after 1 second
-    setTimeout(() => {
-      const responseMsg = {
-        id: messages.length + 2,
-        senderId: activeContactId,
-        text: "Thanks for your message! I'll get back to you shortly.",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: "delivered",
-      };
-      setMessages(prevMessages => [...prevMessages, responseMsg]);
-    }, 1000);
+    try {
+      const sentMessage = await chatService.sendMessage(activeContactId, newMessage);
+      
+      // Add the new message to the messages array
+      setMessages(prevMessages => [...prevMessages, sentMessage]);
+      
+      // Update the conversation in the contacts list
+      setContacts(prevContacts => 
+        prevContacts.map(contact => 
+          contact.contact_id === activeContactId 
+            ? {
+                ...contact,
+                last_message: newMessage,
+                last_message_time: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              } 
+            : contact
+        )
+      );
+      
+      // Clear the input
+      setNewMessage("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
+    }
   };
 
   // Mark messages as read when changing contacts
-  const handleContactChange = (contactId: number) => {
+  const handleContactChange = (contactId: string) => {
     setActiveContactId(contactId);
+    
+    // Update the unread count for this contact
     setContacts(prevContacts =>
       prevContacts.map(contact =>
-        contact.id === contactId ? { ...contact, unread: 0 } : contact
+        contact.contact_id === contactId 
+          ? { ...contact, unread_count: 0 } 
+          : contact
       )
     );
+  };
+
+  // Format message time
+  const formatMessageTime = (timeStr: string) => {
+    const date = new Date(timeStr);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // Format conversation time
+  const formatConversationTime = (timeStr: string) => {
+    if (!timeStr) return "";
+    
+    const date = new Date(timeStr);
+    const now = new Date();
+    
+    // If today, show time
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // If this week, show day
+    const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysAgo < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    }
+    
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -194,71 +180,80 @@ export const ChatTab = () => {
         </Tabs>
 
         <ScrollArea className="flex-1 px-4">
-          <div className="space-y-2 pr-4">
-            {filteredContacts.map(contact => (
-              <div
-                key={contact.id}
-                className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                  activeContactId === contact.id ? 'bg-secondary' : 'hover:bg-secondary/50'
-                }`}
-                onClick={() => handleContactChange(contact.id)}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <Avatar>
-                      <AvatarImage src={contact.avatar} alt={contact.name} />
-                      <AvatarFallback>{contact.name.substring(0, 2)}</AvatarFallback>
-                    </Avatar>
-                    {contact.online && (
-                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-medium truncate">{contact.name}</h4>
-                      <span className="text-xs text-muted-foreground">{contact.time}</span>
+          {loading ? (
+            <div className="flex justify-center items-center h-40">
+              <p>Loading conversations...</p>
+            </div>
+          ) : filteredContacts.length === 0 ? (
+            <div className="flex justify-center items-center h-40">
+              <p className="text-muted-foreground">No conversations found</p>
+            </div>
+          ) : (
+            <div className="space-y-2 pr-4">
+              {filteredContacts.map(contact => (
+                <div
+                  key={contact.id}
+                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                    activeContactId === contact.contact_id ? 'bg-secondary' : 'hover:bg-secondary/50'
+                  }`}
+                  onClick={() => handleContactChange(contact.contact_id)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <Avatar>
+                        <AvatarImage src={contact.contact_profile_image} alt={contact.contact_name} />
+                        <AvatarFallback>{contact.contact_name.substring(0, 2)}</AvatarFallback>
+                      </Avatar>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
-                      {contact.unread > 0 && (
-                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-600 text-white text-xs">
-                          {contact.unread}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center">
+                        <h4 className={`font-medium truncate ${contact.unread_count > 0 ? 'text-black' : 'text-gray-700'}`}>
+                          {contact.contact_business_name || contact.contact_name}
+                        </h4>
+                        <span className="text-xs text-muted-foreground">
+                          {formatConversationTime(contact.last_message_time)}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <p className={`text-sm truncate w-40 ${contact.unread_count > 0 ? 'font-medium text-black' : 'text-muted-foreground'}`}>
+                          {contact.last_message}
+                        </p>
+                        {contact.unread_count > 0 && (
+                          <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-600 text-white text-xs">
+                            {contact.unread_count}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </Card>
 
       {/* Chat area */}
       <Card className="w-full lg:w-2/3 flex flex-col h-full">
-        {activeContact && (
+        {activeContact ? (
           <>
             <CardHeader className="pb-2 border-b">
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-3">
                   <Avatar>
-                    <AvatarImage src={activeContact.avatar} alt={activeContact.name} />
-                    <AvatarFallback>{activeContact.name.substring(0, 2)}</AvatarFallback>
+                    <AvatarImage src={activeContact.contact_profile_image} alt={activeContact.contact_name} />
+                    <AvatarFallback>{activeContact.contact_name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold">{activeContact.name}</h3>
+                    <h3 className="font-semibold">
+                      {activeContact.contact_business_name || activeContact.contact_name}
+                    </h3>
                     <p className="text-xs text-muted-foreground">
-                      {activeContact.online ? "Online" : "Offline"}
+                      {activeContact.contact_role === 'service_provider' ? 'Service Provider' : 'Customer'}
                     </p>
                   </div>
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="ghost" size="icon">
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <Video className="h-4 w-4" />
-                  </Button>
                   <Button variant="ghost" size="icon">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
@@ -267,45 +262,48 @@ export const ChatTab = () => {
             </CardHeader>
 
             <CardContent className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.senderId === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {message.senderId !== "user" && (
-                      <Avatar className="h-8 w-8 mr-2">
-                        <AvatarImage src={activeContact.avatar} alt={activeContact.name} />
-                        <AvatarFallback>{activeContact.name.substring(0, 2)}</AvatarFallback>
-                      </Avatar>
-                    )}
+              {messages.length === 0 ? (
+                <div className="flex justify-center items-center h-full">
+                  <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message) => (
                     <div
-                      className={`max-w-[75%] px-4 py-2 rounded-lg ${
-                        message.senderId === "user"
-                          ? "bg-blue-500 text-white"
-                          : "bg-secondary text-primary"
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.sender_id === user?.id ? "justify-end" : "justify-start"}`}
                     >
-                      <p>{message.text}</p>
+                      {message.sender_id !== user?.id && (
+                        <Avatar className="h-8 w-8 mr-2">
+                          <AvatarImage src={activeContact.contact_profile_image} alt={activeContact.contact_name} />
+                          <AvatarFallback>{activeContact.contact_name.substring(0, 2)}</AvatarFallback>
+                        </Avatar>
+                      )}
                       <div
-                        className={`text-xs mt-1 flex justify-end ${
-                          message.senderId === "user" ? "text-blue-100" : "text-muted-foreground"
+                        className={`max-w-[75%] px-4 py-2 rounded-lg ${
+                          message.sender_id === user?.id 
+                            ? "bg-blue-500 text-white"
+                            : "bg-secondary text-primary"
                         }`}
                       >
-                        {message.time}
+                        <p>{message.content}</p>
+                        <div
+                          className={`text-xs mt-1 flex justify-end ${
+                            message.sender_id === user?.id ? "text-blue-100" : "text-muted-foreground"
+                          }`}
+                        >
+                          {formatMessageTime(message.sent_at)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="border-t p-4">
               <div className="flex items-center w-full space-x-2">
-                <Button variant="ghost" size="icon" className="shrink-0">
-                  <PaperclipIcon className="h-5 w-5" />
-                </Button>
                 <Input
                   placeholder="Type a message..."
                   value={newMessage}
@@ -318,15 +316,22 @@ export const ChatTab = () => {
                   }}
                   className="flex-1"
                 />
-                <Button variant="ghost" size="icon" className="shrink-0">
-                  <SmileIcon className="h-5 w-5" />
-                </Button>
                 <Button className="shrink-0" onClick={handleSendMessage}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
             </CardFooter>
           </>
+        ) : (
+          <div className="flex justify-center items-center h-full">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-medium">No conversation selected</h3>
+              <p className="text-muted-foreground">
+                Choose a conversation from the list or start a new one
+              </p>
+            </div>
+          </div>
         )}
       </Card>
     </div>
