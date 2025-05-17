@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,22 +17,40 @@ import {
   PackageOpen,
   Star,
   FileText,
-  X,
-  ChevronLeft
+  X
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
+import chatService, { ChatMessage, ChatConversation } from "@/services/chatService";
+import { useAuthStore } from "@/store/useAuthStore";
+import { cn } from "@/lib/utils";
+
+// Define interfaces for notification types
+interface Notification {
+  id: string;
+  type: "booking" | "payment" | "alert" | "package" | "review" | "system";
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  icon: React.ComponentType<any>;
+}
+
+interface NotificationDetail {
+  title: string;
+  subtitle: string;
+  [key: string]: any;
+}
 
 // Detailed notification content for each notification type
-const notificationDetails = {
+const notificationDetails: Record<string, NotificationDetail> = {
   "notif-1": {
     title: "New Booking Request",
     subtitle: "Wedding Photography Package",
@@ -116,14 +134,22 @@ const notificationDetails = {
 };
 
 const ProviderNotifications = () => {
-  const [activeTab, setActiveTab] = useState("messages");
-  const [activeChat, setActiveChat] = useState("chat-2");
+  // Real chat state
+  const { user } = useAuthStore();
+  const [contacts, setContacts] = useState<ChatConversation[]>([]);
+  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
+  const [loadingChats, setLoadingChats] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Notification state
+  const [activeTab, setActiveTab] = useState("messages");
   const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
   const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
   
-  // Sample data - would come from API in real implementation
-  const initialNotifications = [
+  // Sample notifications data - would come from API in real implementation
+  const initialNotifications: Notification[] = [
     {
       id: "notif-1",
       type: "booking",
@@ -181,97 +207,149 @@ const ProviderNotifications = () => {
   ];
 
   // Store notifications in state so we can update them
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
-  const chats = [
-    {
-      id: "chat-1",
-      name: "Emily Johnson",
-      avatar: "/avatars/emily.jpg",
-      lastMessage: "Can we discuss the flower arrangements for my wedding?",
-      time: "10:45 AM",
-      unread: 2,
-      online: true
-    },
-    {
-      id: "chat-2",
-      name: "Michael Smith",
-      avatar: "/avatars/michael.jpg",
-      lastMessage: "Thanks for the quote! I'd like to proceed with booking.",
-      time: "Yesterday",
-      unread: 0,
-      online: false
-    },
-    {
-      id: "chat-3",
-      name: "Sarah Williams",
-      avatar: "/avatars/sarah.jpg",
-      lastMessage: "The event was perfect! Thank you so much.",
-      time: "Apr 15",
-      unread: 0,
-      online: true
-    },
-    {
-      id: "chat-4",
-      name: "David Lee",
-      avatar: "/avatars/david.jpg",
-      lastMessage: "Do you have availability for next month?",
-      time: "Apr 12",
-      unread: 1,
-      online: false
-    },
-    {
-      id: "chat-5",
-      name: "EventHub Support",
-      avatar: "/avatars/support.jpg",
-      lastMessage: "Your account has been verified successfully.",
-      time: "Apr 10",
-      unread: 0,
-      online: true
+  // Fetch conversations on component mount and when active tab is messages
+  useEffect(() => {
+    if (activeTab === "messages") {
+      const fetchConversations = async () => {
+        try {
+          setLoadingChats(true);
+          const conversations = await chatService.getConversations();
+          setContacts(conversations);
+          
+          // Set active contact to first conversation if available and none selected yet
+          if (conversations.length > 0 && !activeContactId) {
+            setActiveContactId(conversations[0].contact_id);
+          }
+        } catch (error) {
+          console.error("Error fetching conversations:", error);
+          toast.error("Failed to load conversations");
+        } finally {
+          setLoadingChats(false);
+        }
+      };
+
+      fetchConversations();
+      
+      // Set up polling for new messages every 10 seconds
+      const intervalId = setInterval(fetchConversations, 10000);
+      
+      return () => clearInterval(intervalId);
     }
-  ];
-  
-  const messages = {
-    "chat-1": [
-      { id: 1, sender: "them", text: "Hello! I'm interested in your wedding services for August next year.", time: "10:30 AM" },
-      { id: 2, sender: "me", text: "Hi Emily! Thanks for reaching out. I'd be happy to discuss our wedding packages for August 2026.", time: "10:32 AM" },
-      { id: 3, sender: "them", text: "Great! We're looking for a complete package including catering, decoration, and photography.", time: "10:35 AM" },
-      { id: 4, sender: "me", text: "We can definitely arrange that. Our Premium Wedding Package includes all those services. Would you like me to send you the detailed brochure?", time: "10:40 AM" },
-      { id: 5, sender: "them", text: "Yes please! Also, can we discuss the flower arrangements for my wedding?", time: "10:45 AM" }
-    ],
-    "chat-2": [
-      { id: 1, sender: "them", text: "Hi there! I'm planning a corporate event for about 100 people.", time: "Yesterday, 3:15 PM" },
-      { id: 2, sender: "me", text: "Hello Michael! Thanks for considering our services. We have several corporate packages that would work well for 100 guests.", time: "Yesterday, 3:20 PM" },
-      { id: 3, sender: "them", text: "Could you send me a quote for your standard package with additional AV equipment?", time: "Yesterday, 3:25 PM" },
-      { id: 4, sender: "me", text: "Absolutely! I've prepared a quote based on your requirements. The total comes to $4,500 including the additional AV setup you requested.", time: "Yesterday, 4:00 PM" },
-      { id: 5, sender: "them", text: "Thanks for the quote! I'd like to proceed with booking.", time: "Yesterday, 4:30 PM" }
-    ],
-    "chat-3": [
-      { id: 1, sender: "me", text: "Hello Sarah! Looking forward to hosting your birthday celebration this weekend.", time: "Apr 14, 9:00 AM" },
-      { id: 2, sender: "them", text: "Hi! I'm excited too. Just wanted to confirm that everything is set for Saturday?", time: "Apr 14, 9:15 AM" },
-      { id: 3, sender: "me", text: "Yes, everything is confirmed! We'll have the venue ready by 6 PM as discussed.", time: "Apr 14, 9:20 AM" },
-      { id: 4, sender: "them", text: "Perfect, thank you!", time: "Apr 14, 9:22 AM" },
-      { id: 5, sender: "them", text: "The event was perfect! Thank you so much.", time: "Apr 15, 11:30 AM" }
-    ],
-    "chat-4": [
-      { id: 1, sender: "them", text: "Hello, I'm interested in your services for a corporate event.", time: "Apr 12, 2:00 PM" },
-      { id: 2, sender: "me", text: "Hi David! I'd be happy to help with your corporate event. Could you provide some details about what you're looking for?", time: "Apr 12, 2:15 PM" },
-      { id: 3, sender: "them", text: "We need a venue for a team-building event, around 50 people.", time: "Apr 12, 2:20 PM" },
-      { id: 4, sender: "them", text: "Do you have availability for next month?", time: "Apr 12, 2:21 PM" }
-    ],
-    "chat-5": [
-      { id: 1, sender: "them", text: "Welcome to EventHub! We're reviewing your service provider application.", time: "Apr 9, 10:00 AM" },
-      { id: 2, sender: "them", text: "Your account has been verified successfully.", time: "Apr 10, 9:00 AM" }
-    ]
+  }, [activeTab, activeContactId]);
+
+  // Fetch messages when active contact changes
+  useEffect(() => {
+    if (!activeContactId || activeTab !== "messages") return;
+    
+    const fetchMessages = async () => {
+      try {
+        const messageData = await chatService.getMessages(activeContactId);
+        setMessages(messageData);
+        // Scroll to bottom of messages
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        toast.error("Failed to load messages");
+      }
+    };
+
+    fetchMessages();
+    
+    // Set up polling for new messages
+    const intervalId = setInterval(fetchMessages, 5000);
+    return () => clearInterval(intervalId);
+  }, [activeContactId, activeTab]);
+
+  // Format message time
+  const formatMessageTime = (timeStr: string) => {
+    const date = new Date(timeStr);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  const sendMessage = () => {
-    if (!messageText.trim()) return;
-    // In a real app, you would send this to an API
-    console.log(`Sending message to ${activeChat}: ${messageText}`);
-    setMessageText("");
+  // Format conversation time
+  const formatConversationTime = (timeStr: string) => {
+    if (!timeStr) return "";
+    
+    const date = new Date(timeStr);
+    const now = new Date();
+    
+    // If today, show time
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // If this week, show day
+    const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysAgo < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    }
+    
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  // Handle sending a message
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !activeContactId || !user) return;
+    
+    try {
+      // Send the message using the chat service
+      const sentMessage = await chatService.sendMessage(activeContactId, messageText);
+      
+      // Add the new message to the messages array
+      setMessages(prevMessages => [...prevMessages, sentMessage]);
+      
+      // Update the conversation in the contacts list
+      setContacts(prevContacts => 
+        prevContacts.map(contact => 
+          contact.contact_id === activeContactId 
+            ? {
+                ...contact,
+                last_message: messageText,
+                last_message_time: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              } 
+            : contact
+        )
+      );
+      
+      // Clear the input
+      setMessageText("");
+      
+      // Scroll to bottom of messages
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
+    }
+  };
+
+  // Get unread message count
+  const getUnreadMessageCount = () => {
+    return contacts.reduce((sum, contact) => sum + contact.unread_count, 0);
   };
   
+  // Handle contact selection
+  const handleContactSelect = (contactId: string) => {
+    setActiveContactId(contactId);
+    
+    // Update the unread count for this contact
+    setContacts(prevContacts =>
+      prevContacts.map(contact =>
+        contact.contact_id === contactId 
+          ? { ...contact, unread_count: 0 } 
+          : contact
+      )
+    );
+  };
+
+  // Notification functions
   const markAllAsRead = () => {
     // Update all notifications to be marked as read
     const updatedNotifications = notifications.map(notif => ({
@@ -298,17 +376,13 @@ const ProviderNotifications = () => {
     return notifications.filter(notif => !notif.read).length;
   };
 
-  const getUnreadMessageCount = () => {
-    return chats.reduce((sum, chat) => sum + chat.unread, 0);
-  };
-  
-  const getNotificationIcon = (IconComponent) => {
-    return <IconComponent className="h-4 w-4" />;
+  const getNotificationIcon = (NotificationIcon: React.ComponentType<any>) => {
+    return <NotificationIcon className="h-4 w-4" />;
   };
 
   // Function to render the detailed content based on notification type
   const renderNotificationDetail = (notificationId: string) => {
-    const details = notificationDetails[notificationId as keyof typeof notificationDetails];
+    const details = notificationDetails[notificationId];
     const notification = notifications.find(n => n.id === notificationId);
     if (!details || !notification) return null;
 
@@ -318,7 +392,7 @@ const ProviderNotifications = () => {
         case "payment": return "bg-green-50 border-green-200";
         case "alert": return "bg-red-50 border-red-200";
         case "package": return "bg-purple-50 border-purple-200";
-        case "review": return "bg-yellow-50 border-yellow-200";
+               case "review": return "bg-yellow-50 border-yellow-200";
         case "system": return "bg-gray-50 border-gray-200";
         default: return "bg-gray-50 border-gray-200";
       }
@@ -454,7 +528,7 @@ const ProviderNotifications = () => {
             <div>
               <p className="text-sm text-gray-500">Conflicting Events</p>
               <div className="mt-2 space-y-3">
-                {details.conflictingEvents?.map((event, index) => (
+                {details.conflictingEvents?.map((event: any, index: number) => (
                   <div key={index} className="p-3 bg-white rounded border">
                     <p className="font-medium">{event.name}</p>
                     <p className="text-sm text-gray-500">Client: {event.client}</p>
@@ -551,7 +625,7 @@ const ProviderNotifications = () => {
             <div>
               <p className="text-sm text-gray-500">Major Changes</p>
               <ul className="list-disc pl-5 mt-1 space-y-1">
-                {details.majorChanges?.map((change, index) => (
+                {details.majorChanges?.map((change: string, index: number) => (
                   <li key={index} className="text-sm">{change}</li>
                 ))}
               </ul>
@@ -598,118 +672,165 @@ const ProviderNotifications = () => {
             {/* Chat list */}
             <div className="w-1/3 border-r">
               <div className="p-3 border-b">
-                <Input 
-                  placeholder="Search conversations..." 
-                  className="w-full"
-                  prefix={<Search className="h-4 w-4 text-muted-foreground" />}
-                />
+                {/* Fixed the Input implementation with proper icon positioning */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search conversations..." 
+                    className="w-full pl-9"
+                  />
+                </div>
               </div>
               <div className="overflow-y-auto h-[calc(600px-48px)]">
-                {chats.map(chat => (
-                  <div 
-                    key={chat.id}
-                    className={`p-3 border-b cursor-pointer hover:bg-gray-50 ${activeChat === chat.id ? 'bg-gray-100' : ''}`}
-                    onClick={() => setActiveChat(chat.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="relative">
-                          <Avatar>
-                            <AvatarImage src={chat.avatar} alt={chat.name} />
-                            <AvatarFallback>{chat.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                          </Avatar>
-                          {chat.online && (
-                            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>
-                          )}
-                        </div>
-                        <div>
-                          <p className={`font-medium ${chat.unread ? 'text-black' : 'text-gray-700'}`}>{chat.name}</p>
-                          <p className={`text-xs truncate w-40 ${chat.unread ? 'font-medium text-black' : 'text-muted-foreground'}`}>
-                            {chat.lastMessage}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">{chat.time}</p>
-                        {chat.unread > 0 && (
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
-                            {chat.unread}
-                          </span>
-                        )}
-                      </div>
+                {loadingChats ? (
+                  <div className="flex justify-center items-center h-40">
+                    <p className="text-muted-foreground">Loading conversations...</p>
+                  </div>
+                ) : contacts.length === 0 ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="text-center px-4">
+                      <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground">No conversations yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Messages from users will appear here
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  contacts.map(contact => (
+                    <div 
+                      key={contact.id}
+                      className={`p-3 border-b cursor-pointer hover:bg-gray-50 ${activeContactId === contact.contact_id ? 'bg-gray-100' : ''}`}
+                      onClick={() => handleContactSelect(contact.contact_id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <Avatar>
+                              <AvatarImage src={contact.contact_profile_image} alt={contact.contact_name} />
+                              <AvatarFallback>{contact.contact_name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                          </div>
+                          <div>
+                                                       <p className={`font-medium ${contact.unread_count ? 'text-black' : 'text-gray-700'}`}>
+                              {contact.contact_name}
+                            </p>
+                            <p className={`text-xs truncate w-40 ${contact.unread_count ? 'font-medium text-black' : 'text-muted-foreground'}`}>
+                              {contact.last_message}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">{formatConversationTime(contact.last_message_time)}</p>
+                          {contact.unread_count > 0 && (
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
+                              {contact.unread_count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
             
             {/* Chat window */}
             <div className="w-2/3 flex flex-col">
-              {/* Chat header */}
-              <div className="p-3 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {activeChat && (
-                    <>
-                      <Avatar>
-                        <AvatarImage 
-                          src={chats.find(c => c.id === activeChat)?.avatar} 
-                          alt={chats.find(c => c.id === activeChat)?.name} 
-                        />
-                        <AvatarFallback>
-                          {chats.find(c => c.id === activeChat)?.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{chats.find(c => c.id === activeChat)?.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {chats.find(c => c.id === activeChat)?.online ? 'Online' : 'Offline'}
-                        </p>
+              {activeContactId && contacts.length > 0 ? (
+                <>
+                  {/* Chat header */}
+                  <div className="p-3 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {activeContactId && (
+                        <>
+                          <Avatar>
+                            <AvatarImage 
+                              src={contacts.find(c => c.contact_id === activeContactId)?.contact_profile_image} 
+                              alt={contacts.find(c => c.contact_id === activeContactId)?.contact_name} 
+                            />
+                            <AvatarFallback>
+                              {contacts.find(c => c.contact_id === activeContactId)?.contact_name.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{contacts.find(c => c.contact_id === activeContactId)?.contact_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {contacts.find(c => c.contact_id === activeContactId)?.contact_role === 'service_provider' 
+                                ? 'Service Provider' 
+                                : 'Customer'}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {messages.length === 0 ? (
+                      <div className="flex justify-center items-center h-full">
+                        <div className="text-center px-6">
+                          <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                          <p className="text-muted-foreground">No messages yet</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Start the conversation with this customer!
+                          </p>
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </div>
-              
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {activeChat && messages[activeChat]?.map(message => (
-                  <div 
-                    key={message.id} 
-                    className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`max-w-[70%] rounded-lg p-3 ${
-                        message.sender === 'me' 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-200'
-                      }`}
-                    >
-                      <p className="text-sm">{message.text}</p>
-                      <p className={`text-xs mt-1 ${message.sender === 'me' ? 'text-blue-100' : 'text-gray-500'}`}>
-                        {message.time}
-                      </p>
+                    ) : (
+                      messages.map(message => (
+                        <div 
+                          key={message.id} 
+                          className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div 
+                            className={`max-w-[70%] rounded-lg p-3 ${
+                              message.sender_id === user?.id 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-gray-200'
+                            }`}
+                          >
+                            <p className="text-sm">{message.content}</p>
+                            <p className={`text-xs mt-1 ${message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'}`}>
+                              {formatMessageTime(message.sent_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                  
+                  {/* Message input */}
+                  <div className="p-3 border-t">
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        placeholder="Type a message..." 
+                        value={messageText}
+                        onChange={e => setMessageText(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                      />
+                      <Button onClick={handleSendMessage} className="px-3">
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-              
-              {/* Message input */}
-              <div className="p-3 border-t">
-                <div className="flex items-center gap-2">
-                  <Input 
-                    placeholder="Type a message..." 
-                    value={messageText}
-                    onChange={e => setMessageText(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                  />
-                  <Button onClick={sendMessage} className="px-3">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                </>
+              ) : (
+                <div className="flex-1 flex justify-center items-center">
+                  <div className="text-center px-6">
+                    <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                    <p className="font-medium">No conversation selected</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select a conversation from the list to view messages
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -782,8 +903,6 @@ const ProviderNotifications = () => {
           </DialogHeader>
           
           {selectedNotification && renderNotificationDetail(selectedNotification)}
-          
-          {/* Removed booking action buttons */}
         </DialogContent>
       </Dialog>
     </div>
@@ -791,3 +910,4 @@ const ProviderNotifications = () => {
 };
 
 export default ProviderNotifications;
+

@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader } from "lucide-react";
 import providerService from "@/services/providerService";
 import reviewService from "@/services/reviewService"; // Add this import
+import chatService from "@/services/chatService";
 
 // Import all the components we created
 import { 
@@ -23,6 +24,7 @@ import {
 
 const ServiceProviderProfile = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [provider, setProvider] = useState<ServiceProvider | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,8 +99,28 @@ const ServiceProviderProfile = () => {
     }
   };
 
-  const handleChat = () => {
-    toast.info("Chat functionality will be available soon!");
+  const handleChat = async () => {
+    if (!user) {
+      toast.error("Please login to chat with this service provider");
+      return;
+    }
+    
+    if (provider) {
+      try {
+        // Send an initial message to create the conversation if one doesn't exist
+        await chatService.sendMessage(
+          provider.id, 
+          `Hello, I'm interested in your services.`
+        );
+        
+        // Navigate to the chat tab in profile page
+        navigate("/profile?tab=messages");
+        toast.success(`Started chat with ${provider.businessName || provider.name}`);
+      } catch (error) {
+        console.error("Error starting chat:", error);
+        toast.error("Failed to start chat. Please try again.");
+      }
+    }
   };
 
   const handleDateSelect = (date: string) => {
