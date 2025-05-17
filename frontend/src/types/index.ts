@@ -22,10 +22,17 @@ export interface ServiceProvider {
   serviceType: string[];
   eventTypes?: string[];
   serviceLocations?: string[];
-  location: string;
+  location: string | {
+    city: string;
+    address: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  };
   email: string;
   contactNumber: string;
-  nicNumber: string;
+  nicNumber?: string; // Make this optional with the ? operator
   businessRegNumber?: string;
   business_description?: string;
   status: string;
@@ -66,9 +73,7 @@ export interface ServiceProvider {
     videos?: string[];
   };
   isNewcomer?: boolean;
-  packages?: Package[];
 }
-
 // Package Types
 export interface Package {
   id: string;
