@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader } from "lucide-react";
 import providerService from "@/services/providerService";
+import reviewService from "@/services/reviewService"; // Add this import
 
 // Import all the components we created
 import { 
@@ -29,28 +30,7 @@ const ServiceProviderProfile = () => {
   const { addToCart, user } = useApp();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
-
-  // Mock reviews - will be replaced with real data later
-  const mockReviews: Review[] = [
-    {
-      id: "1",
-      userId: "101",
-      serviceProviderId: id || "",
-      userName: "John Smith",
-      rating: 5,
-      comment: "Fantastic service! Everything was perfect and exactly as promised. Highly recommend!",
-      date: "2025-03-15",
-    },
-    {
-      id: "2",
-      userId: "102",
-      serviceProviderId: id || "",
-      userName: "Sarah Johnson",
-      rating: 4,
-      comment: "Great experience overall. Very professional team and good value for money.",
-      date: "2025-02-28",
-    },
-  ];
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     const fetchProviderData = async () => {
@@ -77,6 +57,16 @@ const ServiceProviderProfile = () => {
           console.error("Error fetching gallery:", galleryError);
           // Don't set main error - just log gallery error
         }
+
+        // Fetch provider reviews
+        try {
+          const reviewsData = await reviewService.getProviderReviews(id);
+          setReviews(reviewsData);
+        } catch (reviewsError) {
+          console.error("Error fetching reviews:", reviewsError);
+          // Don't set main error - just log reviews error
+        }
+        
       } catch (err) {
         console.error("Error fetching provider details:", err);
         setError("Failed to load service provider details.");
@@ -88,6 +78,10 @@ const ServiceProviderProfile = () => {
     fetchProviderData();
   }, [id, user]);
 
+  // Add this new function to handle when a new review is added
+  const handleReviewAdded = (newReview: Review) => {
+    setReviews(prev => [newReview, ...prev]);
+  };
   const handleAddToCart = () => {
     if (provider) {
       addToCart(provider);
@@ -182,7 +176,11 @@ const ServiceProviderProfile = () => {
               </TabsContent>
               
               <TabsContent value="reviews" className="mt-6">
-                <ReviewsTab provider={provider} reviews={mockReviews} />
+                <ReviewsTab 
+                  provider={provider} 
+                  reviews={reviews} 
+                  onReviewAdded={handleReviewAdded}
+                />
               </TabsContent>
               
               <TabsContent value="availability" className="mt-6">
@@ -206,3 +204,5 @@ const ServiceProviderProfile = () => {
 };
 
 export default ServiceProviderProfile;
+
+

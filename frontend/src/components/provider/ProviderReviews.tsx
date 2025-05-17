@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -6,54 +6,13 @@ import { Star, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-
-const reviews = [
-  {
-    id: 1,
-    name: "Emma Wilson",
-    date: "Apr 15, 2025",
-    rating: 5,
-    comment: "Amazing service! The photographer was professional and the photos turned out beautifully. Would definitely recommend!",
-    packageName: "Wedding Photography Premium",
-    avatar: "EW",
-  },
-  {
-    id: 2,
-    name: "Michael Brown",
-    date: "Apr 10, 2025",
-    rating: 4,
-    comment: "Great photography service. The pictures were delivered on time and looked great. Could have had more variety in poses.",
-    packageName: "Birthday Party Standard",
-    avatar: "MB",
-  },
-  {
-    id: 3,
-    name: "Sarah Johnson",
-    date: "Apr 5, 2025",
-    rating: 5,
-    comment: "Excellent service from start to finish! The photographer captured all the special moments during our corporate event.",
-    packageName: "Corporate Event Coverage",
-    avatar: "SJ",
-  },
-  {
-    id: 4,
-    name: "David Lee",
-    date: "Mar 28, 2025",
-    rating: 3,
-    comment: "The photos were good, but the turnaround time was longer than promised. Otherwise, the service was decent.",
-    packageName: "Family Photoshoot",
-    avatar: "DL",
-  },
-  {
-    id: 5,
-    name: "Jennifer Chen",
-    date: "Mar 20, 2025",
-    rating: 5,
-    comment: "Absolutely loved working with this photographer! They made our anniversary shoot so comfortable and fun.",
-    packageName: "Anniversary Photoshoot",
-    avatar: "JC",
-  },
-];
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
+import reviewService from "@/services/reviewService";
+import { Review } from "@/types";
 
 const renderStars = (rating: number) => {
   return Array(5)
@@ -67,25 +26,44 @@ const renderStars = (rating: number) => {
     ));
 };
 
-const ReviewCard = ({ review }: { review: any }) => {
+const ReviewCard = ({ review, onReplySubmitted }: { review: any; onReplySubmitted: (reviewId: string, response: string) => Promise<void> }) => {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitReply = async () => {
+    if (replyText.trim() === "") return;
+    
+    setIsSubmitting(true);
+    try {
+      await onReplySubmitted(review.id, replyText);
+      setIsReplying(false);
+      setReplyText("");
+    } catch (error) {
+      console.error("Error submitting reply:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-4">
             <Avatar>
-              <AvatarImage src={`/avatars/${review.id}.png`} alt={review.name} />
-              <AvatarFallback>{review.avatar}</AvatarFallback>
+              <AvatarImage src={review.userImage} alt={review.userName} />
+              <AvatarFallback>{review.userName?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">{review.name}</p>
-              <p className="text-sm text-gray-500">{review.date}</p>
+              <p className="font-medium">{review.userName}</p>
+              <p className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString()}</p>
               <div className="mt-1 flex">
                 {renderStars(review.rating)}
               </div>
             </div>
           </div>
-          <Badge variant="outline">{review.packageName}</Badge>
+          {review.packageName && <Badge variant="outline">{review.packageName}</Badge>}
         </div>
         <p className="mt-4 text-gray-700">{review.comment}</p>
         {review.response && (
@@ -94,12 +72,39 @@ const ReviewCard = ({ review }: { review: any }) => {
             <p className="text-sm text-gray-700">{review.response}</p>
           </div>
         )}
-        {!review.response && (
+        {!review.response && !isReplying && (
           <div className="mt-4">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setIsReplying(true)}>
               <MessageSquare className="mr-2 h-4 w-4" />
               Reply to Review
             </Button>
+          </div>
+        )}
+        {isReplying && (
+          <div className="mt-4 space-y-3">
+            <Textarea
+              placeholder="Write your response to this review..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              className="min-h-[80px]"
+            />
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsReplying(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleSubmitReply}
+                disabled={isSubmitting || replyText.trim() === ""}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Reply"}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
@@ -108,15 +113,68 @@ const ReviewCard = ({ review }: { review: any }) => {
 };
 
 const ProviderReviews = () => {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuthStore();
+  
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!user) return;
+      
+      try {
+        const reviewsData = await reviewService.getProviderReviews(user.id);
+        setReviews(reviewsData);
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        toast("Failed to load reviews", {
+          description: "Please try again later"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchReviews();
+  }, [user]);
+
+  // Function to handle reply submission
+  const handleReplySubmitted = async (reviewId: string, response: string) => {
+    try {
+      const updatedReview = await reviewService.replyToReview(reviewId, response);
+      
+      // Update the reviews state with the new response
+      setReviews(prev => 
+        prev.map(review => 
+          review.id === reviewId ? { ...review, response } : review
+        )
+      );
+      
+      toast("Reply submitted", {
+        description: "Your response has been added to the review"
+      });
+    } catch (error) {
+      console.error("Error submitting reply:", error);
+      toast("Failed to submit reply", {
+        description: "Please try again"
+      });
+      throw error; // Re-throw for the component to handle
+    }
+  };
+
   // Calculate rating statistics
   const totalReviews = reviews.length;
-  const averageRating = 
-    reviews.reduce((acc, review) => acc + review.rating, 0) / totalReviews;
+  const averageRating = totalReviews > 0
+    ? reviews.reduce((acc, review) => acc + review.rating, 0) / totalReviews
+    : 0;
   
   const ratingCounts = [0, 0, 0, 0, 0]; // For ratings 1-5
   reviews.forEach(review => {
     ratingCounts[review.rating - 1]++;
   });
+
+  if (loading) {
+    return <div className="text-center py-8">Loading reviews...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -155,20 +213,43 @@ const ProviderReviews = () => {
               </CardHeader>
               <CardContent>
                 <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-medium">75% responded</span>
-                    <span className="text-sm font-medium">18 of 24</span>
-                  </div>
-                  <Progress value={75} className="h-2" />
+                  {totalReviews > 0 ? (
+                    <>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium">
+                          {Math.round((reviews.filter(r => r.response).length / totalReviews) * 100)}% responded
+                        </span>
+                        <span className="text-sm font-medium">
+                          {reviews.filter(r => r.response).length} of {totalReviews}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={(reviews.filter(r => r.response).length / totalReviews) * 100}
+                        className="h-2"
+                      />
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-500">No reviews yet</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
 
           <div className="space-y-4">
-            {reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
+            {reviews.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No reviews yet</p>
+              </div>
+            ) : (
+              reviews.map((review) => (
+                <ReviewCard 
+                  key={review.id} 
+                  review={review} 
+                  onReplySubmitted={handleReplySubmitted}
+                />
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -177,7 +258,7 @@ const ProviderReviews = () => {
             {reviews
               .filter((r) => r.rating > 3)
               .map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewCard key={review.id} review={review} onReplySubmitted={handleReplySubmitted} />
               ))}
           </div>
         </TabsContent>
@@ -187,7 +268,7 @@ const ProviderReviews = () => {
             {reviews
               .filter((r) => r.rating === 3)
               .map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewCard key={review.id} review={review} onReplySubmitted={handleReplySubmitted} />
               ))}
           </div>
         </TabsContent>
@@ -197,7 +278,7 @@ const ProviderReviews = () => {
             {reviews
               .filter((r) => r.rating < 3)
               .map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewCard key={review.id} review={review} onReplySubmitted={handleReplySubmitted} />
               ))}
           </div>
         </TabsContent>
@@ -216,7 +297,7 @@ const ProviderReviews = () => {
                   <div key={rating} className="flex items-center gap-2">
                     <div className="w-10 text-right">{rating} ★</div>
                     <Progress 
-                      value={(ratingCounts[rating - 1] / totalReviews) * 100} 
+                      value={totalReviews > 0 ? (ratingCounts[rating - 1] / totalReviews) * 100 : 0}
                       className="h-3 flex-1" 
                     />
                     <div className="w-10 text-left text-gray-500">

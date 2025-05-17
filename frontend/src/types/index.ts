@@ -182,6 +182,7 @@ export interface Review {
   userImage?: string;
   rating: number;
   comment: string;
+  response?: string; // Add this field for service provider responses
   date: string;
 }
 
