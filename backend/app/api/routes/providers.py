@@ -1232,3 +1232,59 @@ async def get_provider_gallery(provider_id: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid provider ID format"
         )
+
+
+@router.get("/providers/{provider_id}/packages", response_model=list)
+async def get_provider_packages_by_id(provider_id: str):
+    """Get all packages for a specific service provider by ID"""
+    db = await get_database()
+    
+    try:
+        # Check if provider exists and is approved
+        provider = await db.users.find_one({
+            "_id": ObjectId(provider_id), 
+            "role": "service_provider",
+            "approval_status": "approved"
+        })
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found or not approved"
+            )
+        
+        # Get provider packages
+        cursor = db.provider_packages.find({"provider_id": provider_id})
+        packages = await cursor.to_list(length=100)
+        
+        # Convert ObjectId to string for each package and rename fields to match frontend
+        formatted_packages = []
+        for package in packages:
+            formatted_package = dict(package)
+            
+            # Convert _id to id
+            if "_id" in formatted_package:
+                formatted_package["id"] = str(formatted_package["_id"])
+                del formatted_package["_id"]
+            
+            # Map crowdSizeMin and crowdSizeMax to capacity
+            if "crowdSizeMin" in formatted_package and "crowdSizeMax" in formatted_package:
+                formatted_package["capacity"] = {
+                    "min": formatted_package["crowdSizeMin"],
+                    "max": formatted_package["crowdSizeMax"]
+                }
+                # Keep the original fields for compatibility
+            
+            # Ensure eventType is a string (if eventTypes is a list, use the first one)
+            if "eventTypes" in formatted_package and isinstance(formatted_package["eventTypes"], list):
+                formatted_package["eventType"] = formatted_package["eventTypes"][0] if formatted_package["eventTypes"] else ""
+            
+            formatted_packages.append(formatted_package)
+        
+        return formatted_packages
+    
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
+        )

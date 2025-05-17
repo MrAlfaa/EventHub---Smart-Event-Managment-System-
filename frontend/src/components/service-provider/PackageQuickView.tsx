@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Package } from '@/types';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, ChevronRight, ChevronLeft, Tag, Check, Users, Calendar, ShoppingCart } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, Check, Users, Calendar, ShoppingCart } from "lucide-react";
 import SystemBookingForm from '@/components/booking/SystemBookingForm';
 
 interface PackageQuickViewProps {
@@ -18,7 +18,6 @@ export const PackageQuickView: React.FC<PackageQuickViewProps> = ({
   isOpen,
   onClose,
   onAddToCart,
-  onBookNow
 }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -68,13 +67,13 @@ export const PackageQuickView: React.FC<PackageQuickViewProps> = ({
 
   const nextImage = () => {
     if (pkg.images && pkg.images.length > 0) {
-      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % pkg.images.length);
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % pkg.images!.length);
     }
   };
 
   const prevImage = () => {
     if (pkg.images && pkg.images.length > 0) {
-      setCurrentImageIndex((prevIndex) => (prevIndex - 1 + pkg.images.length) % pkg.images.length);
+      setCurrentImageIndex((prevIndex) => (prevIndex - 1 + pkg.images!.length) % pkg.images!.length);
     }
   };
 
@@ -96,7 +95,7 @@ export const PackageQuickView: React.FC<PackageQuickViewProps> = ({
           <div className="relative h-64 sm:h-72 md:h-80 overflow-hidden">
             {hasImages ? (
               <img 
-                src={pkg.images[currentImageIndex]} 
+                src={pkg.images![currentImageIndex]} 
                 alt={`${pkg.name} - image ${currentImageIndex + 1}`} 
                 className="w-full h-full object-cover"
               />
@@ -113,7 +112,7 @@ export const PackageQuickView: React.FC<PackageQuickViewProps> = ({
             )}
             
             {/* Carousel Navigation */}
-            {hasImages && pkg.images.length > 1 && (
+            {hasImages && pkg.images!.length > 1 && (
               <>
                 <button 
                   onClick={prevImage}
@@ -132,7 +131,7 @@ export const PackageQuickView: React.FC<PackageQuickViewProps> = ({
                 
                 {/* Image indicators */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {pkg.images.map((_, idx) => (
+                  {pkg.images!.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setCurrentImageIndex(idx)}

@@ -88,6 +88,11 @@ export interface Package {
     max: number;
   };
   thumbnailImage?: string;
+  features?: string[];
+  images?: string[]; // Add this property
+  provider_id?: string;
+  bookings?: number;
+  status?: string;
 }
 
 // Event types and categories

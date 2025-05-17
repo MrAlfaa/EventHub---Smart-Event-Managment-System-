@@ -175,7 +175,21 @@ const providerService = {
       }
       throw error;
     }
+  },
+  
+  // Add this function to the providerService object
+  getProviderPackages: async (providerId: string) => {
+    try {
+      const response = await providerApi.get(`/providers/${providerId}/packages`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching provider packages:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
   }
 };
-
 export default providerService;

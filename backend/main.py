@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import users, auth, providers, admin, promotions, reviews, chat  # Add chat here
+from app.api.routes import users, auth, providers, admin, promotions, reviews, chat
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 
@@ -37,5 +37,4 @@ app.include_router(chat.router, prefix=settings.API_V1_STR)  # Add the chat rout
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to EventHub API"}
     return {"message": "Welcome to EventHub API"}
