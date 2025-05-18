@@ -86,16 +86,35 @@ const ServiceProviderProfile = () => {
   };
   const handleAddToCart = () => {
     if (provider) {
-      addToCart(provider);
+      const cartItem = {
+        providerId: provider.id,
+        providerName: provider.name,
+        businessName: provider.businessName,
+        price: provider.hourlyRate || 0,
+        imageUrl: provider.profileImageUrl,
+        quantity: 1
+      };
+      addToCart(cartItem);
       toast.success(`${provider.name} added to cart`);
     }
   };
 
   const handleBookNow = () => {
-    if (provider) {
-      addToCart(provider);
-      // In a real app, you'd navigate to checkout with the selected date
-      toast.success(`Proceeding to booking for ${provider.name}`);
+    if (provider && selectedDate) {
+      // Add the selected date to the provider object before adding to cart
+      const cartItem = {
+        providerId: provider.id,
+        providerName: provider.name,
+        businessName: provider.businessName,
+        price: provider.hourlyRate || 0,
+        imageUrl: provider.profileImageUrl,
+        quantity: 1,
+        selectedDate
+      };
+      addToCart(cartItem);
+      navigate("/checkout");
+    } else {
+      toast.error("Please select a date first");
     }
   };
 

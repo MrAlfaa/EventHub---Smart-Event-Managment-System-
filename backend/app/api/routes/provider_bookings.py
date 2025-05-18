@@ -217,3 +217,59 @@ async def mark_booking_paid(
     del updated_booking["_id"]
     
     return updated_booking
+# Add this endpoint to your provider_bookings.py file
+
+@router.get("/providers/{provider_id}/booked-dates", response_model=dict)
+async def get_provider_booked_dates(provider_id: str):
+    """Get the dates when a provider is booked/unavailable (public endpoint)"""
+    try:
+        db = await get_database()
+        
+        # Check if provider exists
+        provider = await db.users.find_one({
+            "_id": ObjectId(provider_id),
+            "role": "service_provider",
+            "approval_status": "approved"
+        })
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found or not approved"
+            )
+        
+        # Get all pending and confirmed bookings for this provider
+        cursor = db.bookings.find({
+            "providerId": provider_id,
+            "status": {"$in": ["pending", "confirmed"]}
+        })
+        bookings = await cursor.to_list(length=100)
+        
+        # Extract event dates
+        booked_dates = []
+        for booking in bookings:
+            if "eventDate" in booking:
+                # Remove the time part and keep only the date
+                event_date = booking["eventDate"].date().isoformat()
+                booked_dates.append({
+                    "date": event_date,
+                    "type": "booked"
+                })
+        
+        return {"bookedDates": booked_dates}
+        
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
+        )
+    except Exception as e:
+        # Log the detailed error
+        print(f"Error in get_provider_booked_dates: {str(e)}")
+        print(traceback.format_exc())
+        
+        # Return a generic error for security
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while retrieving booked dates"
+        )

@@ -1235,6 +1235,7 @@ async def get_provider_gallery(provider_id: str):
 
 
 @router.get("/providers/{provider_id}/packages", response_model=list)
+@router.get("/providers/{provider_id}/packages", response_model=list)
 async def get_provider_packages_by_id(provider_id: str):
     """Get all packages for a specific service provider by ID"""
     db = await get_database()
@@ -1283,6 +1284,50 @@ async def get_provider_packages_by_id(provider_id: str):
         
         return formatted_packages
     
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
+        )
+
+
+@router.get("/providers/{provider_id}/booked-dates", response_model=dict)
+async def get_provider_booked_dates(provider_id: str):
+    """Get the dates when a provider is booked/unavailable (public endpoint)"""
+    try:
+        db = await get_database()
+        
+        # Check if provider exists and is approved
+        provider = await db.users.find_one({
+            "_id": ObjectId(provider_id),
+            "role": "service_provider",
+            "approval_status": "approved"
+        })
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found or not approved"
+            )
+        
+        # Get all pending and confirmed bookings for this provider
+        cursor = db.bookings.find({
+            "providerId": provider_id,
+            "status": {"$in": ["pending", "confirmed"]}
+        })
+        bookings = await cursor.to_list(length=100)
+        
+        # Extract event dates
+        booked_dates = []
+        for booking in bookings:
+            if "eventDate" in booking:
+                booked_dates.append({
+                    "date": booking["eventDate"].isoformat(),
+                    "type": "booked"
+                })
+        
+        return {"bookedDates": booked_dates}
+        
     except (ValueError, InvalidId):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
