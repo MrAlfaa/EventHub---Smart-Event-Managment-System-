@@ -1,25 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import users, auth, providers, admin, promotions, reviews, chat, bookings
+from app.api.routes import users, auth, providers, admin, promotions, reviews, chat, bookings, provider_bookings
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 app = FastAPI(title="EventHub API")
-
-# Configure CORS with explicit origin specification
+# Configure CORS - make it more permissive for development
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Specify your frontend URLs
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"]
-)
-
+      CORSMiddleware,
+      allow_origins=["*"],  # Allow all origins during development
+      allow_credentials=True,
+      allow_methods=["*"],  # Allow all methods
+      allow_headers=["*"],  # Allow all headers
+      expose_headers=["*"]
+  )
 # Database connection events
 @app.on_event("startup")
 async def startup_db_client():
     await connect_to_mongo()
+    print("Connected to MongoDB!")  # Add debug print
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
@@ -33,9 +32,18 @@ app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(promotions.router, prefix=settings.API_V1_STR)
 app.include_router(reviews.router, prefix=settings.API_V1_STR)
 app.include_router(chat.router, prefix=settings.API_V1_STR)
-app.include_router(bookings.router, prefix=settings.API_V1_STR)  # Add the bookings router
+app.include_router(bookings.router, prefix=settings.API_V1_STR)
+app.include_router(provider_bookings.router, prefix=settings.API_V1_STR)
+
+# Add debug route at root level
+@app.get("/debug-routes")
+async def debug_routes():
+    """List all registered routes for debugging"""
+    routes = []
+    for route in app.routes:
+        routes.append({"path": route.path, "name": route.name, "methods": route.methods})
+    return {"routes": routes}
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to EventHub API"}
     return {"message": "Welcome to EventHub API"}

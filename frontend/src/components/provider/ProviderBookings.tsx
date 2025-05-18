@@ -43,7 +43,14 @@ const ProviderBookings = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Bookings</h1>
         <div className="flex gap-2 items-center">
-          {/* Add additional header buttons here if needed in the future */}
+          <Button
+            onClick={() => setShowAddBookingDialog(true)}
+            className="flex items-center"
+            variant="default"
+          >
+            <PlusCircle className="h-4 w-4 mr-1" />
+            Add Booking
+          </Button>
         </div>
       </div>
 
@@ -74,8 +81,15 @@ const ProviderBookings = () => {
               Pending
             </Button>
             <Button 
+              variant={filter === "confirmed" ? "default" : "outline"}
+              className={filter === "confirmed" ? "bg-blue-50" : ""}
+              onClick={() => setFilter("confirmed")}
+            >
+              Confirmed
+            </Button>
+            <Button 
               variant={filter === "completed" ? "default" : "outline"}
-              className={filter === "completed" ? "bg-blue-50" : ""}
+              className={filter === "completed" ? "bg-green-50" : ""}
               onClick={() => setFilter("completed")}
             >
               Completed
@@ -105,19 +119,25 @@ const ProviderBookings = () => {
         </TabsContent>
       </Tabs>
       
+      {/* We'll use the details view component later when implementing the add booking functionality */}
       <BookingDetailsView 
         open={showBookingDetailsDialog} 
         onOpenChange={setShowBookingDetailsDialog} 
         bookingId={currentBookingId} 
       />
       
-      <AddBookingForm
-        open={showAddBookingDialog}
-        onOpenChange={setShowAddBookingDialog}
-        onBookingAdded={handleBookingAdded}
-      />
+      {/* This will be implemented later */}
+      {showAddBookingDialog && (
+        <AddBookingForm
+          open={showAddBookingDialog}
+          onOpenChange={setShowAddBookingDialog}
+          onBookingAdded={handleBookingAdded}
+        />
+      )}
     </div>
   );
 };
+
+
 
 export default ProviderBookings;

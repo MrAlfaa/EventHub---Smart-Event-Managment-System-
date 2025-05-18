@@ -23,6 +23,13 @@ async def create_booking(
     new_booking["status"] = "pending"  # Initial status is pending
     new_booking["createdAt"] = datetime.utcnow()
     
+    # Make sure providerId is included for provider-side lookups
+    if "providerId" not in new_booking or not new_booking["providerId"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provider ID is required"
+        )
+    
     # Add payment information
     new_booking["payments"] = [{
         "amount": booking_data.paymentAmount,
@@ -41,13 +48,12 @@ async def create_booking(
     # Get the inserted booking
     booking = await db.bookings.find_one({"_id": result.inserted_id})
     
-    # Convert ObjectId to string - IMPORTANT FIX
+    # Convert ObjectId to string
     if booking:
         booking["id"] = str(booking["_id"])
-        del booking["_id"]  # Remove the ObjectId to prevent serialization issues
+        del booking["_id"]
     
     return booking
-
 @router.get("/bookings/user", response_model=List[dict])
 async def get_user_bookings(current_user: UserInDB = Depends(get_current_user)):
     """Get all bookings for the current user"""
