@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CreditCard, Calendar } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, Calendar, Lock, User, X } from "lucide-react";
+import { User, X, Lock } from "lucide-react";
 
 interface PaymentDetailsFormProps {
   isOpen: boolean;
@@ -21,14 +23,61 @@ const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
   amount,
   currency
 }) => {
-  // Form state
-  const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
-  
-  // Error state
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!cardName.trim()) newErrors.cardName = "Cardholder name is required";
+    
+    if (!cardNumber.trim()) {
+      newErrors.cardNumber = "Card number is required";
+    } else if (!/^\d{16}$/.test(cardNumber.replace(/\s/g, ''))) {
+      newErrors.cardNumber = "Please enter a valid 16-digit card number";
+    }
+    
+    if (!expiryDate.trim()) {
+      newErrors.expiryDate = "Expiry date is required";
+    } else if (!/^(0[1-9]|1[0-2])\/([0-9]{2})$/.test(expiryDate)) {
+      newErrors.expiryDate = "Please enter a valid expiry date (MM/YY)";
+    }
+    
+    if (!cvv.trim()) {
+      newErrors.cvv = "CVV is required";
+    } else if (!/^\d{3,4}$/.test(cvv)) {
+      newErrors.cvv = "Please enter a valid CVV";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (validateForm()) {
+      setIsSubmitting(true);
+      
+      // Simulate payment processing
+      setTimeout(() => {
+        const paymentDetails = {
+          cardName,
+          cardNumber: cardNumber.replace(/\d(?=\d{4})/g, "*"),
+          expiryDate,
+          lastFourDigits: cardNumber.slice(-4)
+        };
+        
+        toast.success("Payment processed successfully!");
+        onComplete(paymentDetails);
+        setIsSubmitting(false);
+      }, 1500);
+    }
+  };
   
   // Format card number with spaces
   const formatCardNumber = (value: string) => {
@@ -59,53 +108,6 @@ const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
     return v;
   };
   
-  // Validate form
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!cardNumber.trim()) {
-      newErrors.cardNumber = "Card number is required";
-    } else if (cardNumber.replace(/\s+/g, '').length !== 16) {
-      newErrors.cardNumber = "Card number must be 16 digits";
-    }
-    
-    if (!cardName.trim()) {
-      newErrors.cardName = "Name on card is required";
-    }
-    
-    if (!expiryDate.trim()) {
-      newErrors.expiryDate = "Expiry date is required";
-    } else if (!(/^\d{2}\/\d{2}$/).test(expiryDate)) {
-      newErrors.expiryDate = "Invalid expiry date format (MM/YY)";
-    }
-    
-    if (!cvv.trim()) {
-      newErrors.cvv = "CVV is required";
-    } else if (cvv.length !== 3) {
-      newErrors.cvv = "CVV must be 3 digits";
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-  
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Payment form submitted");
-    
-    if (validateForm()) {
-      console.log("Payment validation successful");
-      // Process payment
-      onComplete({
-        cardNumber: cardNumber.replace(/\s+/g, ''),
-        cardName,
-        expiryDate,
-        lastFourDigits: cardNumber.slice(-4)
-      });
-    }
-  };
-  
   // Format currency
   const formatCurrency = (value: number, currency: string) => {
     return `${value.toLocaleString()} ${currency}`;
@@ -115,7 +117,7 @@ const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center text-xl">
             <CreditCard className="mr-2 h-5 w-5" />
@@ -259,7 +261,7 @@ const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
           </div>
           
           {/* Form actions */}
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3 pt-4 sticky bottom-0 bg-white p-2">
             <Button 
               type="button" 
               variant="outline" 
@@ -272,8 +274,9 @@ const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
             <Button 
               type="submit"
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+              disabled={isSubmitting}
             >
-              Pay {formatCurrency(amount, currency)}
+              {isSubmitting ? "Processing..." : `Pay ${formatCurrency(amount, currency)}`}
             </Button>
           </div>
         </form>

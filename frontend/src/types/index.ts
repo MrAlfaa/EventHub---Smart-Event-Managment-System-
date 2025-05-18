@@ -6,6 +6,7 @@ export interface User {
   email: string;
   phone: string;
   profileImage?: string;
+  address?: string;  // Add the address property
   role: 'user' | 'service_provider' | 'admin' | 'super_admin';
 }
 import { ReactNode } from "react";
@@ -88,6 +89,11 @@ export interface Package {
     max: number;
   };
   thumbnailImage?: string;
+  features?: string[];
+  images?: string[]; // Add this property
+  provider_id?: string;
+  bookings?: number;
+  status?: string;
 }
 
 // Event types and categories

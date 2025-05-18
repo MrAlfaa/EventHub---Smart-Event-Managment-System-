@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Package } from '@/types'; // Add this import for Package type
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -175,7 +176,19 @@ const providerService = {
       }
       throw error;
     }
-  }
-};
-
+  },
+  
+  getProviderPackages: async (providerId: string): Promise<Package[]> => {
+    try {
+      const response = await providerApi.get(`/providers/${providerId}/packages`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching provider packages:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
+  },};
 export default providerService;

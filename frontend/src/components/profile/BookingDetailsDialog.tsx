@@ -29,6 +29,9 @@ export interface BookingDetails {
   eventDate: string;
   eventType: string;
   specialNotes?: string;
+  status?: string;  // Add this property
+  createdAt?: string;  // Add this property
+  cancelledAt?: string;  // Add this property
 }
 
 interface BookingDetailsDialogProps {
@@ -61,7 +64,7 @@ export const BookingDetailsDialog = ({ isOpen, onClose, booking }: BookingDetail
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Package Price</p>
-                <p className="font-medium">LKR {booking.packagePrice.toLocaleString()}</p>
+                <p className="font-medium">LKR {(booking.packagePrice || 0).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Booking Date</p>
@@ -70,6 +73,33 @@ export const BookingDetailsDialog = ({ isOpen, onClose, booking }: BookingDetail
                   <p>{booking.bookingDate}</p>
                 </div>
               </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Booking Status</p>
+                <p className="font-medium">
+                  {booking.status === 'pending' ? 'Pending' : 
+                   booking.status === 'confirmed' ? 'Confirmed' : 
+                   booking.status === 'completed' ? 'Completed' : 
+                   booking.status === 'cancelled' ? 'Cancelled' : booking.status}
+                </p>
+              </div>
+              {booking.createdAt && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Booking Created</p>
+                  <div className="flex items-center">
+                    <Calendar size={16} className="mr-1 text-muted-foreground" />
+                    <p>{new Date(booking.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              )}
+              {booking.status === 'cancelled' && booking.cancelledAt && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Cancelled On</p>
+                  <div className="flex items-center">
+                    <Calendar size={16} className="mr-1 text-muted-foreground" />
+                    <p>{new Date(booking.cancelledAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

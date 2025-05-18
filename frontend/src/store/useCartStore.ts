@@ -1,32 +1,60 @@
+  import { create } from 'zustand';
+  import { persist } from 'zustand/middleware';
 
-import { create } from 'zustand';
-import { ServiceProvider } from '@/types';
-import { toast } from 'sonner';
+  export interface CartItem {
+    id: string;
+    providerId: string;
+    packageId: string;
+    name: string;
+    packageName: string;
+    price: number;
+    currency: string;
+    eventType: string;
+    description: string;
+    profileImage: string;
+    capacity: {
+      min: number;
+      max: number;
+    };
+  }
 
-interface CartState {
-  items: ServiceProvider[];
-  addItem: (provider: ServiceProvider) => void;
-  removeItem: (providerId: string) => void;
-  clearCart: () => void;
-}
+  interface CartStore {
+    items: CartItem[];
+    addToCart: (item: CartItem) => void;
+    removeFromCart: (packageId: string) => void;
+    clearCart: () => void;
+    getTotal: () => number;
+  }
 
-export const useCartStore = create<CartState>()((set) => ({
-  items: [],
-  
-  addItem: (provider) => set((state) => {
-    // Check if provider already exists in cart
-    if (state.items.some(item => item.id === provider.id)) {
-      toast.info("This service provider is already in your cart");
-      return state;
-    }
-    
-    toast.success("Added to cart successfully");
-    return { items: [...state.items, provider] };
-  }),
-  
-  removeItem: (providerId) => set((state) => ({
-    items: state.items.filter(item => item.id !== providerId)
-  })),
-  
-  clearCart: () => set({ items: [] })
-}));
+  const useCartStore = create<CartStore>()(
+    persist(
+      (set, get) => ({
+        items: [],
+      
+        addToCart: (item: CartItem) => {
+          const currentItems = get().items;
+          // Check if item already exists in cart
+          const exists = currentItems.some(cartItem => cartItem.packageId === item.packageId);
+        
+          if (!exists) {
+            set({ items: [...currentItems, item] });
+          }
+        },
+      
+        removeFromCart: (packageId: string) => {
+          set({ items: get().items.filter(item => item.packageId !== packageId) });
+        },
+      
+        clearCart: () => set({ items: [] }),
+      
+        getTotal: () => {
+          return get().items.reduce((total, item) => total + item.price, 0);
+        }
+      }),
+      {
+        name: 'eventhub-cart',
+      }
+    )
+  );
+
+  export default useCartStore;
