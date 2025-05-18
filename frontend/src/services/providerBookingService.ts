@@ -80,7 +80,8 @@ const providerBookingService = {
           bookingId: booking.id,
           customerName: booking.fullName || booking.customerName || "Unknown Customer",
           packageName: booking.packageName || "Custom Package",
-          bookingDate: new Date(booking.createdAt || booking.eventDate || new Date()),
+          // Use eventDate if available, otherwise use createdAt, and ensure it's a real Date
+          bookingDate: new Date(booking.eventDate || booking.createdAt || new Date()),
           advanceAmount: booking.paymentAmount || 0,
           fullAmount: booking.totalAmount || 0,
           status: booking.status || "pending",
@@ -130,7 +131,8 @@ const providerBookingService = {
           bookingId: booking.id,
           customerName: booking.fullName || booking.customerName || "Unknown Customer",
           packageName: booking.packageName || "Custom Package",
-          bookingDate: new Date(booking.createdAt || booking.eventDate || new Date()),
+          // Make sure we're using eventDate for the calendar, not createdAt
+          bookingDate: new Date(booking.eventDate || booking.createdAt || new Date()),
           advanceAmount: booking.paymentAmount || 0,
           fullAmount: booking.totalAmount || 0,
           status: booking.status || "pending",
