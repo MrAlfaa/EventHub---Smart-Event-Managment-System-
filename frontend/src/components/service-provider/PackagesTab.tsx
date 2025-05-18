@@ -8,6 +8,7 @@ import providerService from "@/services/providerService";
 import { PackageQuickView } from "./PackageQuickView";
 import { toast } from "sonner";
 import { useApp } from "@/providers/AppProvider";
+import { useNavigate } from "react-router-dom";
 
 interface PackagesTabProps {
   provider: ServiceProvider;
@@ -20,6 +21,7 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const { addToCart } = useApp();
+  const navigate = useNavigate();
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -45,13 +47,27 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
   }, [provider.id]);
 
   const handleAddToCart = (pkg: Package) => {
-    // Add implementation later
+    addToCart({
+      id: pkg.id,
+      providerId: provider.id,
+      packageId: pkg.id,
+      name: provider.name || 'Service Provider',
+      packageName: pkg.name,
+      price: pkg.price,
+      currency: pkg.currency || 'LKR',
+      eventType: pkg.eventType,
+      description: pkg.description,
+      profileImage: provider.profileImage || pkg.images?.[0] || '/placeholder.jpg',
+      capacity: pkg.capacity
+    });
     toast.success(`${pkg.name} added to cart`);
   };
 
   const handleBookNow = (pkg: Package) => {
-    // Add implementation later
-    toast.success(`Proceeding to book ${pkg.name}`);
+    // First add to cart
+    handleAddToCart(pkg);
+    // Then navigate to checkout
+    navigate("/checkout");
   };
 
   const openQuickView = (pkg: Package) => {

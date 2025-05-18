@@ -6,6 +6,7 @@ export interface User {
   email: string;
   phone: string;
   profileImage?: string;
+  address?: string;  // Add the address property
   role: 'user' | 'service_provider' | 'admin' | 'super_admin';
 }
 import { ReactNode } from "react";

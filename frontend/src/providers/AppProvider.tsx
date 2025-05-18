@@ -1,6 +1,8 @@
 import { EventFilter, ServiceProvider, User } from "@/types";
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
+import useCartStore from '@/store/useCartStore';
+import { CartItem } from '@/store/useCartStore';
 
 interface AppContextType {
   user: User | null;
@@ -10,9 +12,11 @@ interface AppContextType {
   isAuthenticated: boolean;
   isServiceProvider: boolean;
   isAdmin: boolean;
-  cart: ServiceProvider[];
-  addToCart: (provider: ServiceProvider) => void;
-  removeFromCart: (providerId: string) => void;
+  cart: CartItem[];
+  addToCart: (item: CartItem) => void;
+  removeFromCart: (packageId: string) => void;
+  clearCart: () => void;
+  getCartTotal: () => number;
   filter: EventFilter;
   updateFilter: (filter: Partial<EventFilter>) => void;
   clearFilter: () => void;
@@ -37,10 +41,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Get auth state from Zustand store
   const { user: storeUser, isAuthenticated: storeIsAuthenticated } = useAuthStore();
+  const { items, addToCart, removeFromCart, clearCart, getTotal } = useCartStore();
   
   // Existing state
   const [user, setUser] = useState<User | null>(null);
-  const [cart, setCart] = useState<ServiceProvider[]>([]);
   const [filter, setFilter] = useState<EventFilter>(defaultFilter);
   const [availableDates, setAvailableDates] = useState<string[]>([
     new Date(Date.now() + 3 * 86400000).toISOString(),
@@ -109,17 +113,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
-  const addToCart = (provider: ServiceProvider) => {
-    setCart((prev) => {
-      if (prev.find(item => item.id === provider.id)) return prev;
-      return [...prev, provider];
-    });
-  };
-
-  const removeFromCart = (providerId: string) => {
-    setCart((prev) => prev.filter(item => item.id !== providerId));
-  };
-
   const updateFilter = (newFilter: Partial<EventFilter>) => {
     setFilter((prev) => ({ ...prev, ...newFilter }));
   };
@@ -150,9 +143,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated,
         isServiceProvider,
         isAdmin,
-        cart,
+        cart: items,
         addToCart,
         removeFromCart,
+        clearCart,
+        getCartTotal: getTotal,
         filter,
         updateFilter,
         clearFilter,

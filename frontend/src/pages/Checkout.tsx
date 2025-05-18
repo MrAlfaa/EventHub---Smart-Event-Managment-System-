@@ -2,58 +2,21 @@ import { useState } from "react";
 import { useApp } from "@/providers/AppProvider";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-import { Trash, CreditCard, Check, Package, Eye, ShoppingCart } from "lucide-react";
+import { Trash, CreditCard, Eye, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import BookingForm from "@/components/booking/bookingForm";
 import PaymentDetailsForm from "@/components/booking/PaymentDetailsForm";
 import DigitalBill from "@/components/booking/DigitalBill";
+import bookingService from "@/services/bookingService";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const Checkout = () => {
-  const { cart, removeFromCart } = useApp();
+  const { cart, removeFromCart, getCartTotal } = useApp();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const { user } = useAuthStore();
   
-  const totalAmount = cart.reduce(
-    (sum, provider) => {
-      // Check if provider.pricing exists and has required properties
-      if (provider.pricing && typeof provider.pricing.minPrice === 'number' && typeof provider.pricing.maxPrice === 'number') {
-        return sum + (provider.pricing.minPrice + provider.pricing.maxPrice) / 2;
-      }
-      // If there's a package price, use that instead
-      else if (provider.price || provider.packagePrice) {
-        return sum + (provider.price || provider.packagePrice || 0);
-      }
-      // Return the current sum unchanged if pricing data is missing
-      return sum;
-    },
-    0
-  );
-
-  const handlePackageClick = (providerId: string, packageId?: string) => {
-    if (!providerId) return;
-    // Fix the URL path to match your routing structure
-    navigate(`/service-provider/${providerId}?tab=packages${packageId ? `&package=${packageId}` : ''}`);
-  };
-
-  const handleRemoveFromCart = (e: React.MouseEvent, providerId: string) => {
-    e.stopPropagation();
-    removeFromCart(providerId);
-    toast.success("Item removed from cart");
-  };
-  
-  const handleCheckout = () => {
-    setIsSubmitting(true);
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast.success("Your booking was successful!", {
-        description: "You will receive a confirmation email shortly.",
-      });
-      navigate("/");
-    }, 1500);
-  };
-
   // New state for forms
   const [bookingFormOpen, setBookingFormOpen] = useState(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
@@ -62,48 +25,77 @@ const Checkout = () => {
   const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
+  const handleRemoveFromCart = (packageId: string) => {
+    removeFromCart(packageId);
+    toast.success("Item removed from cart");
+  };
+
+  const handleViewDetails = (provider: any) => {
+    // Navigate to service provider profile with the package selected
+    navigate(`/service-providers/${provider.providerId}?tab=packages&package=${provider.packageId}`);
+  };
+
   // Handle booking flow
   const handleBookNow = (provider: any) => {
-    console.log("Starting booking flow for provider:", provider);
     setSelectedProvider(provider);
     setBookingFormOpen(true);
   };
 
-  const handleBookingComplete = (details: any) => {
-    console.log("Booking details received:", details);
+  const handleBookingComplete = async (details: any) => {
     setBookingDetails(details);
     setBookingFormOpen(false);
     // Immediately open payment form after booking completion
     setPaymentFormOpen(true);
   };
 
-  const handlePaymentComplete = (details: any) => {
-    console.log("Payment details received:", details);
-    setPaymentDetails({
-      ...details,
-      paymentDate: new Date()
-    });
-    setPaymentFormOpen(false);
-    setDigitalBillOpen(true);
+  const handlePaymentComplete = async (details: any) => {
+    setIsSubmitting(true);
+    
+    try {
+      const paymentInfo = {
+        ...details,
+        paymentDate: new Date()
+      };
+      
+      setPaymentDetails(paymentInfo);
+
+      // Create a booking record
+      const bookingData = {
+        providerId: selectedProvider.providerId,
+        packageId: selectedProvider.packageId,
+        fullName: bookingDetails.fullName,
+        email: bookingDetails.email,
+        phone: bookingDetails.phone,
+        eventLocation: bookingDetails.eventLocation,
+        eventCoordinatorName: bookingDetails.coordinatorName || null,
+        eventCoordinatorContact: bookingDetails.coordinatorContact || null,
+        eventDate: bookingDetails.eventDate,
+        crowdSize: bookingDetails.crowdSize,
+        eventType: selectedProvider.eventType,
+        paymentMethod: "credit_card",
+        paymentAmount: bookingDetails.advancedAmount,
+        totalAmount: selectedProvider.price,
+        status: "pending"
+      };
+
+      // Call API to create booking
+      await bookingService.createBooking(bookingData);
+      
+      setPaymentFormOpen(false);
+      setDigitalBillOpen(true);
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Payment processing failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleBillConfirm = () => {
     setDigitalBillOpen(false);
-    removeFromCart(selectedProvider.id);
-    navigate("/");
+    removeFromCart(selectedProvider.packageId);
+    navigate("/profile?tab=bookings");
     toast.success("Booking completed successfully!");
-  };
-
-  const handleViewDetails = (provider: any) => {
-    // Make sure we have a valid ID, checking different possible properties
-    const providerId = provider.serviceProviderId || provider.providerId || provider.id;
-    if (!providerId) {
-      toast.error("Service provider details not available");
-      return;
-    }
-    
-    // Navigate to service provider profile with the package selected
-    navigate(`/service-providers/${providerId}?tab=packages${provider.packageId ? `&package=${provider.packageId}` : ''}`);
   };
 
   return (
@@ -143,11 +135,10 @@ const Checkout = () => {
               </Button>
             </div>
           ) : (
-            // Remove the grid and use full width
             <div className="space-y-4">
               {cart.map((provider) => (
                 <div
-                  key={provider.id}
+                  key={provider.packageId}
                   className="group relative rounded-2xl border bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-all duration-300"
                 >
                   <div className="flex flex-col md:flex-row gap-6">
@@ -159,10 +150,6 @@ const Checkout = () => {
                           alt={provider.name}
                           className="h-full w-full object-cover transform transition-transform group-hover:scale-105"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                      </div>
-                      <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white p-2 rounded-xl shadow-lg">
-                        <Package size={18} />
                       </div>
                     </div>
 
@@ -180,15 +167,7 @@ const Checkout = () => {
                       <div className="bg-blue-50 rounded-lg p-3 inline-block">
                         <p className="text-sm text-blue-600 font-medium">Package Price</p>
                         <p className="font-bold text-xl md:text-2xl text-gray-900">
-                          {(() => {
-                            if (provider.pricing && typeof provider.pricing.minPrice === 'number') {
-                              return `${Math.floor((provider.pricing.minPrice + provider.pricing.maxPrice) / 2).toLocaleString()} ${provider.pricing.currency || "LKR"}`;
-                            } else if (provider.price || provider.packagePrice) {
-                              return `${(provider.price || provider.packagePrice || 0).toLocaleString()} ${provider.currency || "LKR"}`;
-                            } else {
-                              return "Price unavailable";
-                            }
-                          })()}
+                          {provider.price.toLocaleString()} {provider.currency}
                         </p>
                       </div>
                     </div>
@@ -217,7 +196,7 @@ const Checkout = () => {
                       <Button
                         variant="ghost"
                         size="lg"
-                        onClick={(e) => handleRemoveFromCart(e, provider.id)}
+                        onClick={() => handleRemoveFromCart(provider.packageId)}
                         className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex items-center justify-center"
                       >
                         <Trash size={18} />
@@ -226,6 +205,20 @@ const Checkout = () => {
                   </div>
                 </div>
               ))}
+
+              {/* Cart Summary */}
+              <div className="mt-6 bg-white p-6 rounded-xl border shadow-sm">
+                <h3 className="text-lg font-semibold mb-4">Cart Summary</h3>
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between">
+                    <span>Subtotal ({cart.length} items)</span>
+                    <span>{getCartTotal().toLocaleString()} LKR</span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mb-6">
+                  * You can book each package individually by clicking "Book Now" button
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -238,13 +231,14 @@ const Checkout = () => {
             isOpen={bookingFormOpen}
             onClose={() => setBookingFormOpen(false)}
             selectedPackage={{
-              id: selectedProvider.id,
+              id: selectedProvider.packageId,
               name: selectedProvider.packageName,
-              price: selectedProvider.price || selectedProvider.packagePrice,
+              price: selectedProvider.price,
               currency: selectedProvider.currency || "LKR",
               eventType: selectedProvider.eventType || "Event",
               capacity: selectedProvider.capacity || { min: 10, max: 1000 },
-              description: selectedProvider.description || ""
+              description: selectedProvider.description || "",
+              services: selectedProvider.services || [] // Add the missing services property
             }}
             onComplete={handleBookingComplete}
           />

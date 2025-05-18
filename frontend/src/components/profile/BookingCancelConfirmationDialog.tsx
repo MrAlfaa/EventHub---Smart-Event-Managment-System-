@@ -78,7 +78,7 @@ export const BookingCancelConfirmationDialog: React.FC<BookingCancelConfirmation
 
           <div className="mt-4 bg-amber-50 p-3 rounded-md">
             <p className="text-sm text-amber-800">
-              <strong>Important:</strong> According to our cancellation policy, you will receive a full refund if your cancellation is more than 30 days before the event, 50% refund if it's between 15-30 days before, and no refund if less than 15 days before the event.
+              <strong>Important:</strong> You can only cancel a booking within 12 hours of making it. After 12 hours, the booking will be automatically accepted and cancellation will not be possible.
             </p>
           </div>
         </div>
