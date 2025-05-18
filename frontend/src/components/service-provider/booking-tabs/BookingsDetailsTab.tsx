@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Calendar, Search, Filter } from "lucide-react";
+import { Calendar, Search, Eye, XCircle, DollarSign, Check, Clock, AlertCircle } from "lucide-react";
 import { BookingHoverCard } from "./BookingHoverCard";
 import { BookingDetailsDialog } from "./BookingDetailsDialog";
 import { BookingCancelDialog } from "./BookingCancelDialog";
 import { toast } from "sonner";
 import providerBookingService from "@/services/providerBookingService";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface BookingData {
   bookingId: string;
@@ -45,7 +47,7 @@ export const BookingsDetailsTab = forwardRef<
   const [searchTerm, setSearchTerm] = useState("");
   const [bookings, setBookings] = useState<BookingData[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingData[]>([]);
-    const [selectedBooking, setSelectedBooking] = useState<BookingData | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<BookingData | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,9 +77,6 @@ export const BookingsDetailsTab = forwardRef<
       console.log("Starting to fetch provider bookings...");
       const data = await providerBookingService.getProviderBookings();
       
-      // Log the exact data we received
-      console.log("BookingsDetailsTab received data:", JSON.stringify(data).substring(0, 200) + "...");
-      
       if (Array.isArray(data)) {
         console.log(`Received ${data.length} bookings`);
         setBookings(data);
@@ -97,7 +96,6 @@ export const BookingsDetailsTab = forwardRef<
       console.error("Error in fetchBookings:", error);
       setBookings([]);
       
-      // Show a more informative error toast
       toast.error("Failed to load bookings. This could be due to network issues or you may need to log in again.", {
         duration: 5000
       });
@@ -105,6 +103,7 @@ export const BookingsDetailsTab = forwardRef<
       setIsLoading(false);
     }
   };
+  
   const filterBookings = () => {
     let filtered = [...bookings];
     
@@ -132,8 +131,18 @@ export const BookingsDetailsTab = forwardRef<
   };
 
   const handleCancelBooking = (booking: BookingData) => {
-    setSelectedBooking(booking);
-    setIsCancelDialogOpen(true);
+    // Only proceed if the booking can be cancelled
+    if (canCancelBooking(booking.bookingDate) && booking.status === "pending") {
+      setSelectedBooking(booking);
+      setIsCancelDialogOpen(true);
+    } else {
+      // Show message explaining why cancellation isn't allowed
+      if (!canCancelBooking(booking.bookingDate)) {
+        toast.error("Bookings can only be cancelled within 12 hours of creation");
+      } else {
+        toast.error(`Cannot cancel a booking with ${booking.status} status`);
+      }
+    }
   };
 
   const onConfirmCancel = async () => {
@@ -160,23 +169,33 @@ export const BookingsDetailsTab = forwardRef<
   };
 
   const handleMarkAsPaid = async (booking: BookingData) => {
-    try {
-      await providerBookingService.markBookingAsPaid(booking.bookingId);
-      
-      // Update local state
-      setBookings(prevBookings => 
-        prevBookings.map(b => 
-          b.bookingId === booking.bookingId
-            ? { ...b, status: 'confirmed', advanceAmount: b.fullAmount }
-            : b
-        )
-      );
-      
-      toast.success("Booking marked as fully paid");
-      setIsDetailsDialogOpen(false);
-    } catch (error: any) {
-      console.error("Error marking booking as paid:", error);
-      toast.error(error.response?.data?.detail || "Failed to mark as paid");
+    // Only proceed if the booking can be marked as paid
+    if (booking.status === "pending" && booking.advanceAmount < booking.fullAmount) {
+      try {
+        await providerBookingService.markBookingAsPaid(booking.bookingId);
+        
+        // Update local state
+        setBookings(prevBookings => 
+          prevBookings.map(b => 
+            b.bookingId === booking.bookingId
+              ? { ...b, status: 'confirmed', advanceAmount: b.fullAmount }
+              : b
+          )
+        );
+        
+        toast.success("Booking marked as fully paid");
+        setIsDetailsDialogOpen(false);
+      } catch (error: any) {
+        console.error("Error marking booking as paid:", error);
+        toast.error(error.response?.data?.detail || "Failed to mark as paid");
+      }
+    } else {
+      // Show message explaining why marking as paid isn't allowed
+      if (booking.status !== "pending") {
+        toast.error(`Cannot mark a ${booking.status} booking as paid`);
+      } else {
+        toast.info("This booking is already fully paid");
+      }
     }
   };
 
@@ -193,20 +212,36 @@ export const BookingsDetailsTab = forwardRef<
   const formatCurrency = (amount: number) => {
     return `${amount.toLocaleString()} LKR`;
   };
-
-  // Get status badge styling
-  const getStatusBadge = (status: string) => {
+  
+  // Get status icon
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return "bg-yellow-500 text-white";
+        return <Clock className="h-3.5 w-3.5 mr-1.5" />;
       case 'confirmed':
-        return "bg-blue-500 text-white";
+        return <Check className="h-3.5 w-3.5 mr-1.5" />;
       case 'completed':
-        return "bg-green-500 text-white";
+        return <Check className="h-3.5 w-3.5 mr-1.5" />;
       case 'cancelled':
-        return "bg-red-500 text-white";
+        return <XCircle className="h-3.5 w-3.5 mr-1.5" />;
       default:
-        return "bg-gray-500 text-white";
+        return <AlertCircle className="h-3.5 w-3.5 mr-1.5" />;
+    }
+  };
+
+  // Get status text color
+  const getStatusTextColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return "text-amber-700";
+      case 'confirmed':
+        return "text-blue-700";
+      case 'completed':
+        return "text-green-700";
+      case 'cancelled':
+        return "text-red-700";
+      default:
+        return "text-gray-700";
     }
   };
 
@@ -217,7 +252,7 @@ export const BookingsDetailsTab = forwardRef<
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search bookings..."
-            className="pl-9"
+            className="pl-9 border-gray-300 focus:border-blue-400"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -225,83 +260,189 @@ export const BookingsDetailsTab = forwardRef<
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8 text-gray-500">Loading bookings...</div>
-      ) : filteredBookings.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          {searchTerm ? "No bookings match your search" : "No bookings found"}
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          Loading your bookings...
+        </div>
+      ) : filteredBookings.length === 0 ? (
+        <div className="text-center py-16 px-4">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="h-8 w-8 text-blue-500" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            {searchTerm ? "No bookings match your search" : "No bookings found"}
+          </h3>
+          <p className="text-gray-500 max-w-md mx-auto">
+            {searchTerm 
+              ? "Try a different search term or clear the search field."
+              : "When customers make bookings, they will appear here. You'll be notified for new bookings."}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 px-4 py-2 bg-gray-100 rounded-t-md hidden lg:grid">
-            <div className="text-sm font-semibold">ID</div>
-            <div className="text-sm font-semibold">Customer</div>
-            <div className="text-sm font-semibold text-right">Amount</div>
-            <div className="text-sm font-semibold text-center">Status</div>
-            <div className="text-sm font-semibold text-right">Actions</div>
+          {/* Header row */}
+          <div className="grid grid-cols-[0.8fr_1.5fr_0.8fr_0.6fr_0.8fr] gap-x-4 px-6 py-3 bg-gray-100 rounded-t-md hidden lg:grid">
+            <div className="text-sm font-medium text-gray-600">ID</div>
+            <div className="text-sm font-medium text-gray-600">Customer & Package</div>
+            <div className="text-sm font-medium text-gray-600 text-right">Amount</div>
+            <div className="text-sm font-medium text-gray-600">Status</div>
+            <div className="text-sm font-medium text-gray-600 text-right">Actions</div>
           </div>
 
           {/* Booking list */}
-          {filteredBookings.map((booking) => (
-            <BookingHoverCard key={booking.bookingId} booking={booking}>
-              <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto_auto_auto] gap-2 lg:gap-x-4 p-4 bg-white rounded-md shadow-sm border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all">
-                {/* Booking ID */}
-                <div className="flex lg:flex-col lg:items-start justify-between">
-                  <div className="font-mono text-xs text-gray-500 lg:mb-1">#{booking.bookingId.slice(-6)}</div>
-                  <div className="lg:hidden text-xs text-gray-500 flex items-center">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {booking.bookingDate.toLocaleDateString()}
+          <div className="space-y-3">
+            {filteredBookings.map((booking) => (
+              <BookingHoverCard key={booking.bookingId} booking={booking}>
+                <div className="bg-white border border-gray-200 rounded-md shadow-sm hover:shadow-md transition-all duration-200">
+                  <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.5fr_0.8fr_0.6fr_0.8fr] gap-x-4 gap-y-3 p-4">
+                    {/* Column 1: Booking ID */}
+                    <div className="flex justify-between lg:block">
+                      <div>
+                        <div className="lg:hidden text-xs text-gray-500 mb-1">Booking ID</div>
+                        <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-md inline-block">
+                          #{booking.bookingId.slice(-6)}
+                        </div>
+                      </div>
+                      <div className="lg:hidden">
+                        <div className="text-xs text-gray-500 mb-1">Date</div>
+                        <div className="text-sm flex items-center">
+                          <Calendar className="h-3 w-3 mr-1 text-gray-500" />
+                          {new Date(booking.bookingDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Column 2: Customer details */}
+                    <div>
+                      <div className="lg:hidden text-xs text-gray-500 mb-1">Customer</div>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900">{booking.customerName}</span>
+                        <span className="text-sm text-gray-600">{booking.packageName}</span>
+                        <span className="text-xs text-gray-500 hidden lg:flex items-center mt-1">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {new Date(booking.bookingDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Column 3: Payment details */}
+                    <div className="flex lg:flex-col lg:items-end">
+                      <div className="lg:hidden text-xs text-gray-500 mr-2 mt-1">Amount:</div>
+                      <div>
+                        <div className="font-medium text-right">{formatCurrency(booking.fullAmount)}</div>
+                        <div className="text-xs text-green-600 text-right mt-1">
+                          {formatCurrency(booking.advanceAmount)} paid
+                        </div>
+                      </div>
+                    </div>
+                                        {/* Column 4: Status - Text only without borders/squares */}
+                    <div className="flex lg:justify-start items-center">
+                      <div className="lg:hidden text-xs text-gray-500 mr-2 mt-1">Status:</div>
+                      <div className="flex items-center">
+                        {getStatusIcon(booking.status)}
+                        <span className={cn(
+                          "text-sm font-medium",
+                          getStatusTextColor(booking.status)
+                        )}>
+                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Column 5: Actions - Always show buttons but disable based on conditions */}
+                    <div className="flex justify-end gap-2 items-center">
+                      <TooltipProvider>
+                        {/* View Details Button - Always enabled */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(booking);
+                              }}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View details</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* Cancel Booking Button - Always shown but disabled if conditions not met */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelBooking(booking);
+                              }}
+                              variant="ghost"
+                              size="icon"
+                              disabled={booking.status !== "pending" || !canCancelBooking(booking.bookingDate)}
+                              className={cn(
+                                "h-8 w-8 rounded-full border",
+                                booking.status === "pending" && canCancelBooking(booking.bookingDate)
+                                  ? "bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200"
+                                  : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                              )}
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {booking.status !== "pending"
+                              ? `Cannot cancel a ${booking.status} booking`
+                              : !canCancelBooking(booking.bookingDate)
+                                ? "Cancellation period (12 hours) has expired"
+                                : "Cancel booking"
+                            }
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* Mark as Fully Paid Button - Always shown but disabled if conditions not met */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsPaid(booking);
+                              }}
+                              variant="ghost"
+                              size="icon"
+                              disabled={booking.status !== "pending" || booking.advanceAmount >= booking.fullAmount}
+                              className={cn(
+                                "h-8 w-8 rounded-full border",
+                                booking.status === "pending" && booking.advanceAmount < booking.fullAmount
+                                  ? "bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200"
+                                  : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                              )}
+                            >
+                              <DollarSign className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {booking.status !== "pending"
+                              ? `Cannot mark a ${booking.status} booking as paid`
+                              : booking.advanceAmount >= booking.fullAmount
+                                ? "This booking is already fully paid"
+                                : "Mark as fully paid"
+                            }
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
+
+                  {/* Mobile view dividers between bookings */}
+                  <div className="lg:hidden border-t border-gray-100 mx-4"></div>
                 </div>
-                
-                {/* Customer info */}
-                <div className="mt-1 lg:mt-0">
-                  <div className="font-medium">{booking.customerName}</div>
-                  <div className="text-sm text-gray-500 truncate">{booking.packageName}</div>
-                  <div className="text-xs text-gray-400 hidden lg:block">
-                    <Calendar className="h-3 w-3 inline mr-1" />
-                    {booking.bookingDate.toLocaleDateString()}
-                  </div>
-                </div>
-                
-                {/* Amount */}
-                <div className="mt-2 lg:mt-0 flex flex-col items-end">
-                  <div className="font-semibold">{formatCurrency(booking.fullAmount)}</div>
-                  <div className="text-xs text-gray-500">
-                    {formatCurrency(booking.advanceAmount)} paid
-                  </div>
-                </div>
-                
-                {/* Status */}
-                <div className="mt-2 lg:mt-0 flex justify-end lg:justify-center">
-                  <span className={cn(
-                    "px-2 py-1 rounded-full text-xs font-medium",
-                    getStatusBadge(booking.status)
-                  )}>
-                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                  </span>
-                </div>
-                
-                {/* Actions */}
-                <div className="mt-3 lg:mt-0 flex justify-end gap-2">
-                  <button
-                    onClick={() => handleViewDetails(booking)}
-                    className="px-3 py-1 text-xs rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                  >
-                    View
-                  </button>
-                  
-                  {booking.status === "pending" && canCancelBooking(booking.bookingDate) && (
-                    <button
-                      onClick={() => handleCancelBooking(booking)}
-                      className="px-3 py-1 text-xs rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </div>
-            </BookingHoverCard>
-          ))}
+              </BookingHoverCard>
+            ))}
+          </div>
         </div>
       )}
       
@@ -326,3 +467,4 @@ export const BookingsDetailsTab = forwardRef<
 });
 
 BookingsDetailsTab.displayName = "BookingsDetailsTab";
+
