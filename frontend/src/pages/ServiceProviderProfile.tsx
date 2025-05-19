@@ -294,4 +294,3 @@ const ServiceProviderProfile = () => {
 };
 
 export default ServiceProviderProfile;
-export default ServiceProviderProfile;
