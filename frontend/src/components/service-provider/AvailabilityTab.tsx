@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ServiceProvider } from "@/types";
+import { ServiceProvider } from "@/types/index";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { useState, useEffect } from "react";

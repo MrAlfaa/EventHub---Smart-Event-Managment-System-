@@ -1,32 +1,53 @@
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { EventFilter, ALL_EVENT_TYPES } from "@/types";
-import { serviceTypes, districts, popularAreas } from "@/data/mockData";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Calendar as CalendarIcon, Filter as FilterIcon, X, ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Slider } from "@/components/ui/slider";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { EventFilter } from "@/types";
+import { 
+  Search, 
+  X, 
+  Users,
+  DollarSign,
+  MapPin,
+  CalendarDays,
+  Tag,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+
+// Event types for filtering
+const EVENT_TYPES = [
+  "Wedding",
+  "Birthday",
+  "Corporate",
+  "Anniversary",
+  "Festival",
+  "Conference",
+  "Party",
+  "Other",
+];
+
+// Service types for filtering
+const SERVICE_TYPES = [
+  "Venue",
+  "Catering",
+  "Photography",
+  "Decoration",
+  "Entertainment",
+  "Planning",
+  "Transportation",
+  "Accommodation",
+];
 
 interface FilterSidebarProps {
   filter: EventFilter;
   onFilterChange: (filter: Partial<EventFilter>) => void;
   onClearFilter: () => void;
-  className?: string;
   onClose?: () => void;
   isMobile?: boolean;
 }
@@ -35,443 +56,265 @@ export function FilterSidebar({
   filter,
   onFilterChange,
   onClearFilter,
-  className,
   onClose,
   isMobile = false,
 }: FilterSidebarProps) {
-  const [budgetRange, setBudgetRange] = useState([
-    filter.budgetRange.min,
-    filter.budgetRange.max,
+  // Local state for slider values
+  const [budgetValue, setBudgetValue] = useState<[number, number]>([
+    filter.budgetRange?.min || 0,
+    filter.budgetRange?.max || 1000000,
   ]);
   
-  const [crowdRange, setCrowdRange] = useState([
-    filter.crowdRange.min,
-    filter.crowdRange.max,
+  const [crowdValue, setCrowdValue] = useState<[number, number]>([
+    filter.crowdRange?.min || 0,
+    filter.crowdRange?.max || 2000,
   ]);
   
-  const [selectedServices, setSelectedServices] = useState<string[]>(
-    filter.services || []
-  );
+  const [locationSearch, setLocationSearch] = useState<string>(filter.location || "");
   
-  const [selectedEventType, setSelectedEventType] = useState<string | undefined>(
-    filter.eventType
-  );
-  
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
-  const [selectedArea, setSelectedArea] = useState<string>("");
-  const [availableAreas, setAvailableAreas] = useState<string[]>([]);
-  
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    filter.date
-  );
-  
-  const [packageFilter, setPackageFilter] = useState<string | null>(
-    filter.packageFilter
-  );
-
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Initialize districts and areas from filter.location
+  // Update local state when filter prop changes
   useEffect(() => {
-    if (filter.location) {
-      const [area, district] = filter.location.split(", ").reverse();
-      if (district && districts.includes(district)) {
-        setSelectedDistrict(district);
-        if (area && popularAreas[district]?.includes(area)) {
-          setSelectedArea(area);
-        }
-      }
-    } else {
-      setSelectedDistrict("");
-      setSelectedArea("");
-    }
-  }, [filter.location]);
-
-  // Update available areas when district changes
-  useEffect(() => {
-    if (selectedDistrict) {
-      const areas = popularAreas[selectedDistrict] || [];
-      setAvailableAreas(areas);
-      if (!areas.includes(selectedArea)) {
-        setSelectedArea("");
-      }
-    } else {
-      setAvailableAreas([]);
-      setSelectedArea("");
-    }
-  }, [selectedDistrict]);
-
-  useEffect(() => {
-    setBudgetRange([filter.budgetRange.min, filter.budgetRange.max]);
-    setCrowdRange([filter.crowdRange.min, filter.crowdRange.max]);
-    setSelectedServices(filter.services || []);
-    setSelectedEventType(filter.eventType);
-    setSelectedDate(filter.date);
-    setPackageFilter(filter.packageFilter);
+    setBudgetValue([
+      filter.budgetRange?.min || 0,
+      filter.budgetRange?.max || 1000000,
+    ]);
+    setCrowdValue([
+      filter.crowdRange?.min || 0,
+      filter.crowdRange?.max || 2000,
+    ]);
+    setLocationSearch(filter.location || "");
   }, [filter]);
-
-  // Add logging for debugging
-  useEffect(() => {
-    console.log('Selected Services:', selectedServices);
-    console.log('Show Advanced:', showAdvanced);
-    console.log('Package Filter:', packageFilter);
-  }, [selectedServices, showAdvanced, packageFilter]);
-
-  const handleServiceSelect = (value: string) => {
-    const updatedServices = selectedServices.includes(value)
-      ? selectedServices.filter((s) => s !== value)
-      : [...selectedServices, value];
-    setSelectedServices(updatedServices);
-  };
-
-  const handleEventTypeChange = (value: string | undefined) => {
-    setSelectedEventType(value);
+  
+  // Update budget range filter
+  const handleBudgetChange = (value: [number, number]) => {
+    setBudgetValue(value);
+    onFilterChange({
+      budgetRange: { min: value[0], max: value[1] },
+    });
   };
   
-  const handleApplyFilters = () => {
-    // Combine district and area for the location
-    const locationString = selectedArea 
-      ? `${selectedArea}, ${selectedDistrict}` 
-      : selectedDistrict || undefined;
-
+  // Update crowd size filter
+  const handleCrowdChange = (value: [number, number]) => {
+    setCrowdValue(value);
     onFilterChange({
-      eventType: selectedEventType,
-      services: selectedServices,
-      date: selectedDate,
-      location: locationString,
-      budgetRange: {
-        min: budgetRange[0],
-        max: budgetRange[1],
-      },
-      crowdRange: {
-        min: crowdRange[0],
-        max: crowdRange[1],
-      },
-      packageFilter: packageFilter as any,
+      crowdRange: { min: value[0], max: value[1] },
     });
-    
-    if (isMobile && onClose) {
-      onClose();
+  };
+  
+  // Toggle event type filter
+  const handleEventTypeChange = (type: string) => {
+    if (filter.eventType === type) {
+      onFilterChange({ eventType: undefined });
+    } else {
+      onFilterChange({ eventType: type });
     }
   };
   
+  // Toggle service type filter
+  const handleServiceTypeChange = (type: string) => {
+    const currentServices = filter.services || [];
+    const serviceExists = currentServices.includes(type);
+    
+    if (serviceExists) {
+      onFilterChange({
+        services: currentServices.filter((service) => service !== type),
+      });
+    } else {
+      onFilterChange({
+        services: [...currentServices, type],
+      });
+    }
+  };
+  
+  // Handle location search
+  const handleLocationSearch = () => {
+    onFilterChange({ location: locationSearch });
+  };
+  
+  // Clear all filters
   const handleClearFilters = () => {
     onClearFilter();
-    
-    if (isMobile && onClose) {
+    if (onClose && isMobile) {
       onClose();
     }
   };
-
-  const filterHeader = (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <FilterIcon size={18} className="text-blue-600" />
-        <h2 className={`${isMobile ? 'text-lg' : 'text-base sm:text-lg'} font-semibold`}>Filters</h2>
-      </div>
-      {isMobile && (
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-          <X size={18} />
-        </Button>
-      )}
-    </div>
-  );
-
-  const filterFooter = (
-    <div className={`mt-6 flex flex-col gap-2 ${isMobile ? 'sticky bottom-0 bg-white pb-4 pt-2' : ''}`}>
-      <Button 
-        onClick={handleApplyFilters} 
-        className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-9 text-xs sm:text-sm'}`}
-      >
-        Apply Filters
-      </Button>
-      <Button 
-        variant="outline" 
-        onClick={handleClearFilters} 
-        className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-9 text-xs sm:text-sm'}`}
-      >
-        Clear All
-      </Button>
-    </div>
-  );
-
-  const filterContent = (
-    <>
-      {filterHeader}
-      
-      <div className={`space-y-5 ${isMobile ? 'pb-20 overflow-y-auto max-h-[calc(100vh-120px)]' : ''}`}>
-        <div>
-          <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Event Type</h3>
-          <Select
-            value={selectedEventType}
-            onValueChange={handleEventTypeChange}
-          >
-            <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-              <SelectValue placeholder="Select event type" />
-            </SelectTrigger>
-            <SelectContent>
-              {ALL_EVENT_TYPES.map((type) => (
-                <SelectItem
-                  key={type}
-                  value={type}
-                  className={isMobile ? 'text-sm' : 'text-xs'}
-                >
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedEventType && (
-            <div className="mt-2">
-              <Badge
-                variant="secondary"
-                className="text-xs"
-                onClick={() => handleEventTypeChange(undefined)}
-              >
-                {selectedEventType}
-                <X className="ml-1 h-3 w-3" />
-              </Badge>
-            </div>
-          )}
-        </div>
-        
-        <div>
-          <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Services</h3>
-          <Select
-            value={selectedServices[0]} // Show the first selected service
-            onValueChange={handleServiceSelect}
-          >
-            <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-              <SelectValue placeholder="Select a service" />
-            </SelectTrigger>
-            <SelectContent>
-              {serviceTypes.map((service) => (
-                <SelectItem
-                  key={service.id}
-                  value={service.name}
-                  className={isMobile ? 'text-sm' : 'text-xs'}
-                >
-                  {service.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedServices.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {selectedServices.map((service) => (
-                <Badge
-                  key={service}
-                  variant="secondary"
-                  className="text-xs"
-                  onClick={() => handleServiceSelect(service)}
-                >
-                  {service}
-                  <X className="ml-1 h-3 w-3" />
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <div>
-          <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Location</h3>
-          <div className="space-y-2">
-            <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-              <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                <SelectValue placeholder="Select district" />
-              </SelectTrigger>
-              <SelectContent>
-                {districts.map((district) => (
-                  <SelectItem 
-                    key={district} 
-                    value={district}
-                    className={isMobile ? 'text-sm' : 'text-xs'}
-                  >
-                    {district}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {selectedDistrict && (
-              <Select value={selectedArea} onValueChange={setSelectedArea}>
-                <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                  <SelectValue placeholder="Select area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAreas.map((area) => (
-                    <SelectItem 
-                      key={area} 
-                      value={area}
-                      className={isMobile ? 'text-sm' : 'text-xs'}
-                    >
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
-        
-        <div>
-          <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Date</h3>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "justify-start text-left font-normal w-full",
-                  !selectedDate && "text-muted-foreground",
-                  isMobile ? 'h-10 text-sm' : 'h-8 text-xs'
-                )}
-              >
-                <CalendarIcon className={`mr-2 ${isMobile ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} />
-                {selectedDate ? (
-                  format(selectedDate, "PPP")
-                ) : (
-                  <span>Select date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                initialFocus
-                className={isMobile ? 'p-3' : 'p-2'}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        
-        <div className="border-t pt-4">
-          <Button
-            variant="ghost"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="mb-4 w-full justify-between text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          >
-            Advanced Filters
-            <ChevronDown className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-          </Button>
-
-          {showAdvanced && (
-            <div className="space-y-5">
-              <div>
-                <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Budget Range (LKR)</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Select 
-                      value={budgetRange[0].toString()} 
-                      onValueChange={value => setBudgetRange([parseInt(value), budgetRange[1]])}
-                    >
-                      <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                        <SelectValue placeholder="Min Budget" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[0, 50000, 100000, 250000, 500000].map((value) => (
-                          <SelectItem key={`min-${value}`} value={value.toString()}>
-                            {value.toLocaleString()} LKR
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Select 
-                      value={budgetRange[1].toString()} 
-                      onValueChange={value => setBudgetRange([budgetRange[0], parseInt(value)])}
-                    >
-                      <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                        <SelectValue placeholder="Max Budget" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[100000, 250000, 500000, 1000000, 2000000].map((value) => (
-                          <SelectItem key={`max-${value}`} value={value.toString()}>
-                            {value.toLocaleString()} LKR
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Crowd Size</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Select 
-                      value={crowdRange[0].toString()} 
-                      onValueChange={value => setCrowdRange([parseInt(value), crowdRange[1]])}
-                    >
-                      <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                        <SelectValue placeholder="Min People" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[0, 50, 100, 200, 500].map((value) => (
-                          <SelectItem key={`min-${value}`} value={value.toString()}>
-                            {value} people
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Select 
-                      value={crowdRange[1].toString()} 
-                      onValueChange={value => setCrowdRange([crowdRange[0], parseInt(value)])}
-                    >
-                      <SelectTrigger className={`w-full ${isMobile ? 'h-10 text-sm' : 'h-8 text-xs'}`}>
-                        <SelectValue placeholder="Max People" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[100, 250, 500, 1000, 2000].map((value) => (
-                          <SelectItem key={`max-${value}`} value={value.toString()}>
-                            {value} people
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Package Options Section */}
-              <div className="space-y-3">
-                <h3 className={`mb-2 font-medium ${isMobile ? 'text-base' : 'text-sm'}`}>Package Options</h3>
-                <RadioGroup 
-                  value={packageFilter || "non-package"}
-                  onValueChange={(value) => setPackageFilter(value)}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="package" id="package" />
-                    <Label htmlFor="package" className={isMobile ? 'text-sm' : 'text-xs'}>
-                      Show as packages
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="non-package" id="non-package" />
-                    <Label htmlFor="non-package" className={isMobile ? 'text-sm' : 'text-xs'}>
-                      Show individual services
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {filterFooter}
-    </>
-  );
-
+  
   return (
-    <div className={cn(`space-y-4 ${isMobile ? 'text-base' : 'text-sm'}`, className)}>
-      {filterContent}
+    <div className="bg-white rounded-lg border border-gray-200 p-4 h-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">Filters</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-gray-500"
+          onClick={handleClearFilters}
+        >
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+      </div>
+      
+      <Accordion type="multiple" defaultValue={["event-type", "service-type", "budget", "crowd-size", "location"]}>
+        {/* Event Type Filter */}
+        <AccordionItem value="event-type">
+          <AccordionTrigger className="text-sm py-2">
+            <span className="flex items-center">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Event Type
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid grid-cols-1 gap-2 mt-1">
+              {EVENT_TYPES.map((type) => (
+                <div key={type} className="flex items-center">
+                  <Checkbox
+                    id={`event-${type}`}
+                    checked={filter.eventType === type}
+                    onCheckedChange={() => handleEventTypeChange(type)}
+                  />
+                  <label
+                    htmlFor={`event-${type}`}
+                    className="ml-2 text-sm font-medium text-gray-700 cursor-pointer"
+                  >
+                    {type}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        
+        {/* Service Type Filter */}
+        <AccordionItem value="service-type">
+          <AccordionTrigger className="text-sm py-2">
+            <span className="flex items-center">
+              <Tag className="h-4 w-4 mr-2" />
+              Service Type
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid grid-cols-1 gap-2 mt-1">
+              {SERVICE_TYPES.map((type) => (
+                <div key={type} className="flex items-center">
+                  <Checkbox
+                    id={`service-${type}`}
+                    checked={filter.services?.includes(type) || false}
+                    onCheckedChange={() => handleServiceTypeChange(type)}
+                  />
+                  <label
+                    htmlFor={`service-${type}`}
+                    className="ml-2 text-sm font-medium text-gray-700 cursor-pointer"
+                  >
+                    {type}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        
+        {/* Budget Range Filter */}
+        <AccordionItem value="budget">
+          <AccordionTrigger className="text-sm py-2">
+            <span className="flex items-center">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Budget Range
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="px-1 mt-4">
+              <Slider
+                value={budgetValue}
+                min={0}
+                max={1000000}
+                step={5000}
+                onValueChange={handleBudgetChange}
+                className="mb-6"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  Rs. {budgetValue[0].toLocaleString()}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Rs. {budgetValue[1].toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        
+        {/* Crowd Size Filter */}
+        <AccordionItem value="crowd-size">
+          <AccordionTrigger className="text-sm py-2">
+            <span className="flex items-center">
+              <Users className="h-4 w-4 mr-2" />
+              Crowd Size
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="px-1 mt-4">
+              <Slider
+                value={crowdValue}
+                min={0}
+                max={2000}
+                step={10}
+                onValueChange={handleCrowdChange}
+                className="mb-6"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {crowdValue[0]} guests
+                </span>
+                <span className="text-xs text-gray-500">
+                  {crowdValue[1]} guests
+                </span>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        
+        {/* Location Filter */}
+        <AccordionItem value="location">
+          <AccordionTrigger className="text-sm py-2">
+            <span className="flex items-center">
+              <MapPin className="h-4 w-4 mr-2" />
+              Location
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="mt-2 space-y-2">
+              <div className="relative">
+                <Input
+                  placeholder="City or area..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  className="pr-8"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleLocationSearch();
+                    }
+                  }}
+                />
+                <Search
+                  className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 cursor-pointer"
+                  onClick={handleLocationSearch}
+                />
+              </div>
+              <div className="text-xs text-gray-500">
+                Enter a city, province, or area
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      
+      {isMobile && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <Button className="w-full" onClick={onClose}>
+            Apply Filters
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

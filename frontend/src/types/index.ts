@@ -101,18 +101,19 @@ export interface Package {
   description: string;
   price: number;
   currency: string;
-  services: PackageService[];
-  eventType: string;
-  capacity: {
+  features: string[];
+  crowdSizeMin: number;
+  crowdSizeMax: number;
+  eventTypes: string[];
+  images: string[];
+  status: string;
+  provider_id: string;
+  bookings?: number;
+  capacity?: {
     min: number;
     max: number;
   };
-  thumbnailImage?: string;
-  features?: string[];
-  images?: string[]; // Add this property
-  provider_id?: string;
-  bookings?: number;
-  status?: string;
+  providerInfo?: ServiceProvider; // We'll include this when fetching packages
 }
 
 // Event types and categories
@@ -167,22 +168,14 @@ export interface ServiceType {
 
 // Filter Types
 export interface EventFilter {
-  eventType?: string;
-  services: string[];
-  date?: Date;
-  location?: string;
-  budgetRange: {
-    min: number;
-    max: number;
-  };
-  crowdRange: {
-    min: number;
-    max: number;
-  };
-  packageFilter: "package" | "non-package" | null;
+  services?: string[];
+  budgetRange?: { min: number; max: number };
+  crowdRange?: { min: number; max: number };
+  packageFilter?: string | null;
   hotelType?: string;
+  eventType?: string;
+  location?: string;
 }
-
 // Booking Types
 export interface Booking {
   id: string;

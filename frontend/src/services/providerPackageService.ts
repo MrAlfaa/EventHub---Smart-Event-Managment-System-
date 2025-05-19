@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ServiceProviderPackage } from '@/types';
+import { ServiceProviderPackage } from '@/types/index.ts';
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';

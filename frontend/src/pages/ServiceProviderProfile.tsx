@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ServiceProvider, Review ,CartItem } from "@/types"; 
+import { ServiceProvider, Review ,CartItem } from "@/types/index"; 
 import { useApp } from "@/providers/AppProvider";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

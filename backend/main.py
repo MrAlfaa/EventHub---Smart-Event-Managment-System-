@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import users, auth, providers, admin, promotions, reviews, chat, bookings, provider_bookings
+from app.api.routes import packages  # Add this import
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 app = FastAPI(title="EventHub API")
@@ -34,6 +35,7 @@ app.include_router(reviews.router, prefix=settings.API_V1_STR)
 app.include_router(chat.router, prefix=settings.API_V1_STR)
 app.include_router(bookings.router, prefix=settings.API_V1_STR)
 app.include_router(provider_bookings.router, prefix=settings.API_V1_STR)
+app.include_router(packages.router, prefix=settings.API_V1_STR)
 
 # Add debug route at root level
 @app.get("/debug-routes")

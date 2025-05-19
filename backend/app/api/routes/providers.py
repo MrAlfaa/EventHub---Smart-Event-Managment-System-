@@ -1333,3 +1333,87 @@ async def get_provider_booked_dates(provider_id: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid provider ID format"
         )
+
+
+@router.get("/packages/available", response_model=list)
+async def get_all_available_packages(
+    eventType: Optional[str] = None,
+    minPrice: Optional[int] = None,
+    maxPrice: Optional[int] = None,
+    crowdSize: Optional[int] = None,
+    serviceType: Optional[str] = None,
+):
+    """Get all available packages with optional filtering"""
+    db = await get_database()
+    
+    # Base query
+    query = {"status": "active"}
+    
+    # Apply filters
+    if eventType:
+        query["eventTypes"] = {"$in": [eventType]}
+    
+    if minPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$gte"] = minPrice
+    
+    if maxPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$lte"] = maxPrice
+    
+    if crowdSize is not None:
+        query["$and"] = [
+            {"crowdSizeMin": {"$lte": crowdSize}},
+            {"crowdSizeMax": {"$gte": crowdSize}}
+        ]
+    
+    # Get approved service provider IDs for packages filtering
+    approved_providers_cursor = db.users.find(
+        {"role": "service_provider", "approval_status": "approved"},
+        {"_id": 1}
+    )
+    approved_provider_ids = [str(p["_id"]) for p in await approved_providers_cursor.to_list(length=None)]
+    
+    # Only include packages from approved providers
+    query["provider_id"] = {"$in": approved_provider_ids}
+    
+    # If service type is provided, find matching providers first
+    if serviceType:
+        provider_profiles_cursor = db.service_provider_profiles.find(
+            {"service_types": {"$regex": serviceType, "$options": "i"}},
+            {"user_id": 1}
+        )
+        matching_provider_ids = [p["user_id"] for p in await provider_profiles_cursor.to_list(length=None)]
+        
+        # Update query to only include packages from these providers
+        query["provider_id"] = {"$in": matching_provider_ids}
+    
+    # Get packages with the query
+    packages_cursor = db.provider_packages.find(query)
+    packages = await packages_cursor.to_list(length=None)
+    
+    # For each package, get provider info and format response
+    result = []
+    
+    for package in packages:
+        # Convert ObjectId to string
+        package["id"] = str(package.pop("_id"))
+        
+        # Get provider info
+        provider = await db.users.find_one({"_id": ObjectId(package["provider_id"])})
+        if provider:
+            provider_profile = await db.service_provider_profiles.find_one({"user_id": str(provider["_id"])})
+            
+            provider_info = {
+                "id": str(provider["_id"]),
+                "name": provider.get("name", ""),
+                "role": provider.get("role", ""),
+                "businessName": provider_profile.get("business_name") if provider_profile else "",
+                "profileImage": provider_profile.get("profile_picture_url") if provider_profile else None,
+            }
+            
+            package["providerInfo"] = provider_info
+        
+        result.append(package)
+    
+    return result
