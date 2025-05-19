@@ -228,8 +228,8 @@ export function FilterSidebar({
         </Button>
       </div>
       
-      <Accordion type="multiple" defaultValue={["event-type", "service-type", "budget", "crowd-size", "location"]}>
-        {/* Event Type Filter */}
+      <Accordion type="multiple" defaultValue={["event-type", "service-type", "location"]}>
+        {/* Event Type Filter - Show in both tabs */}
         <AccordionItem value="event-type">
           <AccordionTrigger className="text-sm py-2">
             <span className="flex items-center">
@@ -258,7 +258,7 @@ export function FilterSidebar({
           </AccordionContent>
         </AccordionItem>
         
-        {/* Service Type Filter */}
+        {/* Service Type Filter - Show in both tabs */}
         <AccordionItem value="service-type">
           <AccordionTrigger className="text-sm py-2">
             <span className="flex items-center">
@@ -287,67 +287,71 @@ export function FilterSidebar({
           </AccordionContent>
         </AccordionItem>
         
-        {/* Budget Range Filter */}
-        <AccordionItem value="budget">
-          <AccordionTrigger className="text-sm py-2">
-            <span className="flex items-center">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Budget Range
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="px-1 mt-4">
-              <Slider
-                value={budgetValue}
-                min={0}
-                max={1000000}
-                step={5000}
-                onValueChange={handleBudgetChange}
-                className="mb-6"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  Rs. {budgetValue[0].toLocaleString()}
-                </span>
-                <span className="text-xs text-gray-500">
-                  Rs. {budgetValue[1].toLocaleString()}
-                </span>
+        {/* Budget Range Filter - Only show in packages tab */}
+        {activeTab !== "providers" && (
+          <AccordionItem value="budget">
+            <AccordionTrigger className="text-sm py-2">
+              <span className="flex items-center">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Budget Range
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="px-1 mt-4">
+                <Slider
+                  value={budgetValue}
+                  min={0}
+                  max={1000000}
+                  step={5000}
+                  onValueChange={handleBudgetChange}
+                  className="mb-6"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    Rs. {budgetValue[0].toLocaleString()}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Rs. {budgetValue[1].toLocaleString()}
+                  </span>
+                </div>
               </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
+            </AccordionContent>
+          </AccordionItem>
+        )}
         
-        {/* Crowd Size Filter */}
-        <AccordionItem value="crowd-size">
-          <AccordionTrigger className="text-sm py-2">
-            <span className="flex items-center">
-              <Users className="h-4 w-4 mr-2" />
-              Crowd Size
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="px-1 mt-4">
-              <Slider
-                value={crowdValue}
-                min={0}
-                max={2000}
-                step={10}
-                onValueChange={handleCrowdChange}
-                className="mb-6"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  {crowdValue[0]} guests
-                </span>
-                <span className="text-xs text-gray-500">
-                  {crowdValue[1]} guests
-                </span>
+        {/* Crowd Size Filter - Only show in packages tab */}
+        {activeTab !== "providers" && (
+          <AccordionItem value="crowd-size">
+            <AccordionTrigger className="text-sm py-2">
+              <span className="flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                Crowd Size
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="px-1 mt-4">
+                <Slider
+                  value={crowdValue}
+                  min={0}
+                  max={2000}
+                  step={10}
+                  onValueChange={handleCrowdChange}
+                  className="mb-6"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    {crowdValue[0]} guests
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {crowdValue[1]} guests
+                  </span>
+                </div>
               </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
+            </AccordionContent>
+          </AccordionItem>
+        )}
         
-        {/* Location Filter */}
+        {/* Location Filter - Show in both tabs */}
         <AccordionItem value="location">
           <AccordionTrigger className="text-sm py-2">
             <span className="flex items-center">
@@ -381,7 +385,7 @@ export function FilterSidebar({
           </AccordionContent>
         </AccordionItem>
 
-        {/* Package Display Mode (Only shown in packages tab) */}
+        {/* Package Display Mode - Only show in packages tab */}
         {activeTab === "packages" && (
           <AccordionItem value="package-mode">
             <AccordionTrigger className="text-sm py-2">
@@ -409,6 +413,12 @@ export function FilterSidebar({
                     </Label>
                   </div>
                 </RadioGroup>
+                
+                {filter.packageDisplayMode === 'grouped' && (
+                  <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
+                    <p>Select 2+ service types and set a budget to see combined packages that fit your requirements.</p>
+                  </div>
+                )}
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -425,5 +435,4 @@ export function FilterSidebar({
         </Button>
       </div>
     </div>
-  );
-}
+  )};
