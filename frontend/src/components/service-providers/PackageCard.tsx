@@ -106,7 +106,7 @@ export const PackageCard = ({ package: pkg }: PackageCardProps) => {
           {formatCurrency(pkg.price)} <span className="text-xs font-normal text-gray-500">{pkg.currency}</span>
         </div>
         <Button size="sm" asChild>
-          <Link to={`/packages/${pkg.id}`}>View Details</Link>
+          <Link to={`/service-providers/${providerInfo.id}?tab=packages&packageId=${pkg.id}`}>View Details</Link>
         </Button>
       </CardFooter>
     </Card>

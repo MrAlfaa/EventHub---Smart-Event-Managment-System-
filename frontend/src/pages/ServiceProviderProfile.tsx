@@ -1,8 +1,8 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ServiceProvider, Review ,CartItem } from "@/types/index"; 
+import { ServiceProvider, Review, CartItem } from "@/types/index"; 
 import { useApp } from "@/providers/AppProvider";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
 
 const ServiceProviderProfile = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [provider, setProvider] = useState<ServiceProvider | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -33,8 +34,27 @@ const ServiceProviderProfile = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [highlightedPackageId, setHighlightedPackageId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("about");
   const tabsRef = useRef<any>(null);
+
+  // Get tab and packageId from URL parameters
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const packageId = searchParams.get('packageId');
+    
+    if (tab && ['about', 'packages', 'availability', 'gallery', 'reviews'].includes(tab)) {
+      setActiveTab(tab);
+    }
+    
+    if (packageId) {
+      setHighlightedPackageId(packageId);
+      // If packageId is present but tab is not 'packages', set tab to 'packages'
+      if (tab !== 'packages') {
+        setActiveTab('packages');
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchProviderData = async () => {
@@ -112,6 +132,11 @@ const ServiceProviderProfile = () => {
   // Function to switch tabs programmatically
   const switchToTab = (tabValue: string) => {
     setActiveTab(tabValue);
+    // Update URL to reflect tab change without full page reload
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', tabValue);
+    navigate(`/service-providers/${id}?${newSearchParams.toString()}`, { replace: true });
+    
     // If using a ref to access the Tabs component
     if (tabsRef.current) {
       // Some tab components have a setValue method
@@ -235,7 +260,8 @@ const ServiceProviderProfile = () => {
               <TabsContent value="packages" className="mt-4 sm:mt-6">
                 <PackagesTab 
                   provider={provider} 
-                  selectedDate={selectedDate} 
+                  selectedDate={selectedDate}
+                  highlightedPackageId={highlightedPackageId}
                 />
               </TabsContent>
               
@@ -267,4 +293,5 @@ const ServiceProviderProfile = () => {
   );
 };
 
+export default ServiceProviderProfile;
 export default ServiceProviderProfile;

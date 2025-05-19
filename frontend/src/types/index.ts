@@ -101,19 +101,19 @@ export interface Package {
   description: string;
   price: number;
   currency: string;
+  images: string[];
   features: string[];
   crowdSizeMin: number;
   crowdSizeMax: number;
   eventTypes: string[];
-  images: string[];
   status: string;
   provider_id: string;
-  bookings?: number;
-  capacity?: {
-    min: number;
-    max: number;
+  providerInfo?: {
+    id: string;
+    name: string;
+    businessName?: string;
+    profileImage?: string;
   };
-  providerInfo?: ServiceProvider; // We'll include this when fetching packages
 }
 
 // Event types and categories
