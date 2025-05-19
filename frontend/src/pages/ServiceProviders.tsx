@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/AppProvider";
 import { Layout } from "@/components/layout/Layout";
 import { useEffect, useState } from "react";
-import { ServiceProvider, Package } from "@/types";
+import { ServiceProvider, Package,EventFilter } from "@/types";
 import { ServiceProviderCard } from "@/components/service-providers/ServiceProviderCard";
 import { PackageCard } from "@/components/service-providers/PackageCard";
 import { FilterSidebar } from "@/components/service-providers/FilterSidebar";
@@ -22,11 +22,13 @@ import {
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 
 const ServiceProviders = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { filter, updateFilter, clearFilter } = useApp();
+  const { toast } = useToast();
   
   // State for providers tab
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -40,7 +42,7 @@ const ServiceProviders = () => {
   
   // Shared state
   const [searchTerm, setSearchTerm] = useState("");
-   const [sortOption, setSortOption] = useState("rating");
+  const [sortOption, setSortOption] = useState("rating");
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("providers");
@@ -72,7 +74,7 @@ const ServiceProviders = () => {
       
       // Apply sorting
       if (sortOption === "rating") {
-        filteredProviders.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        filteredProviders.sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0));
       } else if (sortOption === "price_low") {
         filteredProviders.sort((a, b) => 
           (a.pricing?.minPrice || 0) - (b.pricing?.minPrice || 0)
@@ -89,6 +91,11 @@ const ServiceProviders = () => {
     } catch (err) {
       console.error('Error fetching service providers:', err);
       setProvidersError('Failed to load service providers. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to load service providers. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setProvidersLoading(false);
     }
@@ -107,22 +114,36 @@ const ServiceProviders = () => {
       }
       
       // Only add price filters if they're non-default values
-      if (filter.budgetRange?.min && filter.budgetRange.min > 0) {
+      if (filter.budgetRange?.min !== undefined && filter.budgetRange.min > 0) {
         packageFilters.minPrice = filter.budgetRange.min;
       }
       
-      if (filter.budgetRange?.max && filter.budgetRange.max < 1000000) {
+      if (filter.budgetRange?.max !== undefined && filter.budgetRange.max < 1000000) {
         packageFilters.maxPrice = filter.budgetRange.max;
       }
       
       // Only add crowd size if it's set
-      if (filter.crowdRange?.max && filter.crowdRange.max < 2000) {
-        packageFilters.crowdSize = filter.crowdRange.max;
+      if (filter.crowdRange?.min !== undefined && filter.crowdRange?.max !== undefined) {
+        // Use the user's selected crowd size value
+        packageFilters.crowdSize = Math.floor((filter.crowdRange.min + filter.crowdRange.max) / 2);
       }
       
-      // Only add service type if it's defined
+      // Add service type if defined
       if (filter.services?.length) {
         packageFilters.serviceType = filter.services[0];
+      }
+      
+      // Add location if defined
+      if (filter.location) {
+        packageFilters.location = filter.location;
+      }
+      
+      // Add display mode if defined
+      if (filter.packageDisplayMode) {
+        packageFilters.displayMode = filter.packageDisplayMode;
+      } else {
+        // Default to individual packages
+        packageFilters.displayMode = 'individual';
       }
       
       console.log("Fetching packages with filters:", packageFilters);
@@ -161,6 +182,11 @@ const ServiceProviders = () => {
     } catch (err) {
       console.error('Error fetching packages:', err);
       setPackagesError('Failed to load packages. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to load packages. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setPackagesLoading(false);
     }
@@ -171,9 +197,22 @@ const ServiceProviders = () => {
     const queryParams = new URLSearchParams(location.search);
     const serviceParam = queryParams.get("service");
     const tabParam = queryParams.get("tab");
+    const eventTypeParam = queryParams.get("eventType");
+    
+    // Define updatedFilter as an object with the correct type
+    let updatedFilter: Partial<EventFilter> = {};
     
     if (serviceParam) {
-      updateFilter({ services: [serviceParam] });
+      updatedFilter.services = [serviceParam];
+    }
+    
+    if (eventTypeParam) {
+      updatedFilter.eventType = eventTypeParam;
+    }
+    
+    // Apply any filter updates
+    if (Object.keys(updatedFilter).length > 0) {
+      updateFilter(updatedFilter);
     }
     
     if (tabParam === "packages") {
@@ -200,7 +239,17 @@ const ServiceProviders = () => {
       fetchPackages();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, filter.eventType, filter.services, filter.budgetRange, filter.crowdRange, searchTerm, sortOption]);
+  }, [
+    activeTab, 
+    filter.eventType, 
+    filter.services, 
+    filter.budgetRange, 
+    filter.crowdRange, 
+    filter.location,
+    filter.packageDisplayMode,
+    searchTerm, 
+    sortOption
+  ]);
 
   const toggleFilters = () => {
     setFiltersVisible(!filtersVisible);
@@ -274,6 +323,7 @@ const ServiceProviders = () => {
               onClearFilter={clearFilter}
               onClose={() => setMobileFiltersOpen(false)}
               isMobile={true}
+              activeTab={activeTab}
             />
           </SheetContent>
         </Sheet>
@@ -306,6 +356,7 @@ const ServiceProviders = () => {
                   filter={filter}
                   onFilterChange={updateFilter}
                   onClearFilter={clearFilter}
+                  activeTab={activeTab}
                 />
               </div>
             )}
@@ -362,6 +413,13 @@ const ServiceProviders = () => {
                   <p className="text-xs sm:text-sm text-gray-600">
                     Found <span className="font-semibold">{packages.length}</span> packages
                   </p>
+                  
+                  {/* Package display mode indicator */}
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Showing: <span className="font-semibold">
+                      {filter.packageDisplayMode === 'grouped' ? 'Package Groups' : 'Individual Packages'}
+                    </span>
+                  </div>
                 </div>
 
                 {packagesLoading ? (
@@ -385,7 +443,7 @@ const ServiceProviders = () => {
                       <PackageCard key={pkg.id} package={pkg} />
                     ))}
                   </div>
-                               ) : (
+                ) : (
                   <div className="flex h-40 sm:h-60 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 sm:p-8 text-center">
                     <p className="mb-2 text-base sm:text-lg font-medium text-gray-600">No packages found</p>
                     <p className="text-xs sm:text-sm text-gray-500">Try adjusting your search or filters</p>

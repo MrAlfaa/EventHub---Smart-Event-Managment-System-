@@ -168,13 +168,14 @@ export interface ServiceType {
 
 // Filter Types
 export interface EventFilter {
-  services?: string[];
-  budgetRange?: { min: number; max: number };
-  crowdRange?: { min: number; max: number };
-  packageFilter?: string | null;
-  hotelType?: string;
+  services: string[];
+  budgetRange: { min: number; max: number };
+  crowdRange: { min: number; max: number };
   eventType?: string;
   location?: string;
+  packageFilter?: string | null;
+  packageDisplayMode?: 'individual' | 'grouped'; // Add this new property
+  hotelType?: string;
 }
 // Booking Types
 export interface Booking {

@@ -44,6 +44,8 @@ const packageService = {
     maxPrice?: number; 
     crowdSize?: number;
     serviceType?: string;
+    location?: string;
+    displayMode?: 'individual' | 'grouped';
   }): Promise<Package[]> => {
     try {
       const queryParams = new URLSearchParams();
@@ -52,8 +54,17 @@ const packageService = {
       if (filters.eventType) queryParams.append('eventType', filters.eventType);
       if (filters.minPrice !== undefined) queryParams.append('minPrice', filters.minPrice.toString());
       if (filters.maxPrice !== undefined) queryParams.append('maxPrice', filters.maxPrice.toString());
-      if (filters.crowdSize !== undefined) queryParams.append('crowdSize', filters.crowdSize.toString());
+      
+      // Only add crowdSize if it's explicitly set and not a default value
+      if (filters.crowdSize !== undefined && filters.crowdSize !== 1000) {
+        queryParams.append('crowdSize', filters.crowdSize.toString());
+      }
+      
       if (filters.serviceType) queryParams.append('serviceType', filters.serviceType);
+      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.displayMode) queryParams.append('displayMode', filters.displayMode);
+      
+      console.log(`Fetching packages with params: ${queryParams.toString()}`);
       
       const response = await api.get(`/packages/available?${queryParams.toString()}`);
       return response.data;
@@ -61,7 +72,6 @@ const packageService = {
       console.error('Error fetching packages:', error);
       throw error;
     }
-  }
-};
+  }};
 
 export default packageService;

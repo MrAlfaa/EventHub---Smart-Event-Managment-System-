@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import List, Optional
 from app.models.package import PackageInDB
 from app.db.mongodb import get_database
@@ -8,13 +8,15 @@ from bson import ObjectId
 
 router = APIRouter()
 
-@router.get("/packages/available", response_model=List[dict])
+@router.get("/packages/available", response_model=list)
 async def get_all_available_packages(
     eventType: Optional[str] = None,
     minPrice: Optional[int] = None,
     maxPrice: Optional[int] = None,
     crowdSize: Optional[int] = None,
     serviceType: Optional[str] = None,
+    location: Optional[str] = None,
+    displayMode: Optional[str] = "individual",
 ):
     """Get all available packages with optional filtering"""
     db = await get_database()
@@ -26,17 +28,13 @@ async def get_all_available_packages(
     if eventType:
         query["eventTypes"] = {"$in": [eventType]}
     
-    # Fix the price filter construction to properly handle both min and max
-    price_filter = {}
-    if minPrice is not None and minPrice > 0:
-        price_filter["$gte"] = minPrice
+    if minPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$gte"] = minPrice
     
-    if maxPrice is not None and maxPrice > 0:
-        price_filter["$lte"] = maxPrice
-    
-    # Only add price filter if we have conditions
-    if price_filter:
-        query["price"] = price_filter
+    if maxPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$lte"] = maxPrice
     
     if crowdSize is not None:
         query["$and"] = [
@@ -55,9 +53,24 @@ async def get_all_available_packages(
     query["provider_id"] = {"$in": approved_provider_ids}
     
     # If service type is provided, find matching providers first
-    if serviceType:
+    matching_provider_ids = approved_provider_ids
+    
+    if serviceType or location:
+        provider_query = {}
+        
+        if serviceType:
+            provider_query["service_types"] = {"$regex": serviceType, "$options": "i"}
+        
+        if location:
+            provider_query["$or"] = [
+                {"service_locations": {"$regex": location, "$options": "i"}},
+                {"city": {"$regex": location, "$options": "i"}},
+                {"province": {"$regex": location, "$options": "i"}},
+                {"address": {"$regex": location, "$options": "i"}}
+            ]
+        
         provider_profiles_cursor = db.service_provider_profiles.find(
-            {"service_types": {"$regex": serviceType, "$options": "i"}},
+            provider_query,
             {"user_id": 1}
         )
         matching_provider_ids = [p["user_id"] for p in await provider_profiles_cursor.to_list(length=None)]
@@ -65,15 +78,9 @@ async def get_all_available_packages(
         # Update query to only include packages from these providers
         query["provider_id"] = {"$in": matching_provider_ids}
     
-    # Add debug logging to see the final query
-    print(f"Package query: {query}")
-    
     # Get packages with the query
     packages_cursor = db.provider_packages.find(query)
     packages = await packages_cursor.to_list(length=None)
-    
-    # Print the number of packages found
-    print(f"Found {len(packages)} packages matching the query")
     
     # For each package, get provider info and format response
     result = []
@@ -99,14 +106,22 @@ async def get_all_available_packages(
         
         result.append(package)
     
+    # For grouped display mode, we can implement package grouping logic here
+    # This is a placeholder for future implementation
+    if displayMode == "grouped":
+        # For now, just return the same results
+        # In the future, this would group packages by provider or other criteria
+        pass
+    
     return result
+
 @router.get("/packages/{package_id}", response_model=dict)
 async def get_package_by_id(package_id: str):
-    """Get specific package by ID"""
+    """Get a specific package by ID"""
     db = await get_database()
     
     try:
-        # Find the package by ID
+        # Find the package
         package = await db.provider_packages.find_one({"_id": ObjectId(package_id)})
         
         if not package:
@@ -115,10 +130,7 @@ async def get_package_by_id(package_id: str):
                 detail="Package not found"
             )
         
-        # Convert ObjectId to string
-        package["id"] = str(package.pop("_id"))
-        
-        # Get provider info
+        # Get provider details
         provider = await db.users.find_one({"_id": ObjectId(package["provider_id"])})
         if provider:
             provider_profile = await db.service_provider_profiles.find_one({"user_id": str(provider["_id"])})
@@ -131,12 +143,22 @@ async def get_package_by_id(package_id: str):
                 "profileImage": provider_profile.get("profile_picture_url") if provider_profile else None,
             }
             
+            # Convert ObjectId to string
+            package["id"] = str(package["_id"])
+            del package["_id"]
+            
+            # Add provider info
             package["providerInfo"] = provider_info
-        
-        return package
-        
+            
+            return package
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Provider not found for this package"
+            )
+    
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid package ID format or error: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving package: {str(e)}"
         )

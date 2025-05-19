@@ -2,13 +2,14 @@ import { EventFilter, ServiceProvider, User } from "@/types";
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import useCartStore from '@/store/useCartStore';
+import { useFilterStore } from '@/store/useFilterStore';
 import { CartItem } from '@/store/useCartStore';
 
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   login: (email: string, role: string) => void;
-  logout: () => void;  // Added logout function
+  logout: () => void;
   isAuthenticated: boolean;
   isServiceProvider: boolean;
   isAdmin: boolean;
@@ -20,6 +21,7 @@ interface AppContextType {
   filter: EventFilter;
   updateFilter: (filter: Partial<EventFilter>) => void;
   clearFilter: () => void;
+  hasAppliedFilters: boolean;
   availableDates: string[];
   blockedDates: string[];
   updateAvailableDates: (dates: string[]) => void;
@@ -27,25 +29,16 @@ interface AppContextType {
   autoAcceptBookings: boolean;
   toggleAutoAcceptBookings: () => void;
 }
-
-const defaultFilter: EventFilter = {
-  services: [],
-  budgetRange: { min: 0, max: 1000000 },
-  crowdRange: { min: 0, max: 2000 },
-  packageFilter: null,
-  hotelType: undefined
-};
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Get auth state from Zustand store
   const { user: storeUser, isAuthenticated: storeIsAuthenticated } = useAuthStore();
   const { items, addToCart, removeFromCart, clearCart, getTotal } = useCartStore();
+  const filterStore = useFilterStore();
   
   // Existing state
   const [user, setUser] = useState<User | null>(null);
-  const [filter, setFilter] = useState<EventFilter>(defaultFilter);
   const [availableDates, setAvailableDates] = useState<string[]>([
     new Date(Date.now() + 3 * 86400000).toISOString(),
     new Date(Date.now() + 5 * 86400000).toISOString(),
@@ -113,14 +106,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
-  const updateFilter = (newFilter: Partial<EventFilter>) => {
-    setFilter((prev) => ({ ...prev, ...newFilter }));
-  };
-
-  const clearFilter = () => {
-    setFilter(defaultFilter);
-  };
-
   const updateAvailableDates = (dates: string[]) => {
     setAvailableDates(dates);
   };
@@ -148,9 +133,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         removeFromCart,
         clearCart,
         getCartTotal: getTotal,
-        filter,
-        updateFilter,
-        clearFilter,
+        filter: filterStore.filter,
+        updateFilter: filterStore.updateFilter,
+        clearFilter: filterStore.clearFilter,
+        hasAppliedFilters: filterStore.hasAppliedFilters || false,  // Added fallback
         availableDates,
         blockedDates,
         updateAvailableDates,

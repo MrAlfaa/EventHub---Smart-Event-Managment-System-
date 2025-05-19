@@ -7,6 +7,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { EventFilter } from "@/types";
 import { 
@@ -17,6 +19,7 @@ import {
   MapPin,
   CalendarDays,
   Tag,
+  Package,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -50,6 +53,7 @@ interface FilterSidebarProps {
   onClearFilter: () => void;
   onClose?: () => void;
   isMobile?: boolean;
+  activeTab?: string;
 }
 
 export function FilterSidebar({
@@ -58,6 +62,7 @@ export function FilterSidebar({
   onClearFilter,
   onClose,
   isMobile = false,
+  activeTab = "providers",
 }: FilterSidebarProps) {
   // Local state for slider values
   const [budgetValue, setBudgetValue] = useState<[number, number]>([
@@ -131,9 +136,17 @@ export function FilterSidebar({
     onFilterChange({ location: locationSearch });
   };
   
+  // Handle package display mode change
+  const handlePackageDisplayModeChange = (mode: 'individual' | 'grouped') => {
+    onFilterChange({ packageDisplayMode: mode });
+  };
+  
   // Clear all filters
   const handleClearFilters = () => {
     onClearFilter();
+    // Clear searchTerm as well if you're tracking that
+    // setSearchTerm('');
+    
     if (onClose && isMobile) {
       onClose();
     }
@@ -306,15 +319,50 @@ export function FilterSidebar({
             </div>
           </AccordionContent>
         </AccordionItem>
+
+        {/* Package Display Mode (Only shown in packages tab) */}
+        {activeTab === "packages" && (
+          <AccordionItem value="package-mode">
+            <AccordionTrigger className="text-sm py-2">
+              <span className="flex items-center">
+                <Package className="h-4 w-4 mr-2" />
+                Display Mode
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="mt-2">
+                <RadioGroup
+                  value={filter.packageDisplayMode || 'individual'}
+                  onValueChange={handlePackageDisplayModeChange}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <RadioGroupItem value="individual" id="individual" />
+                    <Label htmlFor="individual" className="text-sm cursor-pointer">
+                      Show Individual Packages
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="grouped" id="grouped" />
+                    <Label htmlFor="grouped" className="text-sm cursor-pointer">
+                      Show as Package Groups
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
       </Accordion>
       
-      {isMobile && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <Button className="w-full" onClick={onClose}>
-            Apply Filters
-          </Button>
-        </div>
-      )}
+      {/* Add Apply Filters button for both mobile and desktop */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <Button 
+          className="w-full" 
+          onClick={isMobile ? onClose : undefined}
+        >
+          Apply Filters
+        </Button>
+      </div>
     </div>
   );
 }
