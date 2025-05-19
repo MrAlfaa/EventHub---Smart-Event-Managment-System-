@@ -9,7 +9,7 @@ export interface User {
   address?: string;  // Add the address property
   role: 'user' | 'service_provider' | 'admin' | 'super_admin';
 }
-import { ReactNode } from "react";
+
 
 export interface CartItem {
   id: string;
