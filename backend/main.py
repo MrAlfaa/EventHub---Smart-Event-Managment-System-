@@ -49,3 +49,4 @@ async def debug_routes():
 @app.get("/")
 async def root():
     return {"message": "Welcome to EventHub API"}
+    
