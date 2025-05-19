@@ -129,6 +129,20 @@ export function FilterSidebar({
         services: [...currentServices, type],
       });
     }
+    
+    // If in package display mode, update the serviceType parameter for API
+    if (filter.packageDisplayMode === 'grouped') {
+      // Pass all selected services to the packageFilter
+      const updatedServices = serviceExists
+        ? currentServices.filter((service) => service !== type)
+        : [...currentServices, type];
+      
+      if (updatedServices.length > 0) {
+        onFilterChange({ packageFilter: updatedServices.join(',') });
+      } else {
+        onFilterChange({ packageFilter: null });
+      }
+    }
   };
   
   // Handle location search
@@ -138,8 +152,55 @@ export function FilterSidebar({
   
   // Handle package display mode change
   const handlePackageDisplayModeChange = (mode: 'individual' | 'grouped') => {
-    onFilterChange({ packageDisplayMode: mode });
+    // If switching to grouped mode, ensure selected services are used for filtering
+    if (mode === 'grouped' && filter.services.length > 0) {
+      onFilterChange({ 
+        packageDisplayMode: mode,
+        packageFilter: filter.services.join(',')
+      });
+    } else {
+      onFilterChange({ packageDisplayMode: mode });
+    }
   };
+
+  // Inside render method, add a message for combined packages option
+  {activeTab === "packages" && (
+    <AccordionItem value="package-mode">
+      <AccordionTrigger className="text-sm py-2">
+        <span className="flex items-center">
+          <Package className="h-4 w-4 mr-2" />
+          Display Mode
+        </span>
+      </AccordionTrigger>
+      <AccordionContent>
+        <div className="mt-2">
+          <RadioGroup
+            value={filter.packageDisplayMode || 'individual'}
+            onValueChange={handlePackageDisplayModeChange}
+          >
+            <div className="flex items-center space-x-2 mb-2">
+              <RadioGroupItem value="individual" id="individual" />
+              <Label htmlFor="individual" className="text-sm cursor-pointer">
+                Show Individual Packages
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mb-2">
+              <RadioGroupItem value="grouped" id="grouped" />
+              <Label htmlFor="grouped" className="text-sm cursor-pointer">
+                Show as Package
+              </Label>
+            </div>
+          </RadioGroup>
+          
+          {filter.packageDisplayMode === 'grouped' && (
+            <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
+              <p>Select 2+ service types and set a budget to see combined packages that fit your requirements.</p>
+            </div>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  )}
   
   // Clear all filters
   const handleClearFilters = () => {
@@ -341,10 +402,10 @@ export function FilterSidebar({
                       Show Individual Packages
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 mb-2">
                     <RadioGroupItem value="grouped" id="grouped" />
                     <Label htmlFor="grouped" className="text-sm cursor-pointer">
-                      Show as Package Groups
+                      Show as Package
                     </Label>
                   </div>
                 </RadioGroup>

@@ -60,13 +60,26 @@ const packageService = {
         queryParams.append('crowdSize', filters.crowdSize.toString());
       }
       
-      if (filters.serviceType) queryParams.append('serviceType', filters.serviceType);
+      // Handle service types
+      if (filters.serviceType) {
+        // If serviceType is an array, join with commas
+        if (Array.isArray(filters.serviceType)) {
+          queryParams.append('serviceType', filters.serviceType.join(','));
+        } else {
+          queryParams.append('serviceType', filters.serviceType);
+        }
+      }
+      
       if (filters.location) queryParams.append('location', filters.location);
       if (filters.displayMode) queryParams.append('displayMode', filters.displayMode);
       
       console.log(`Fetching packages with params: ${queryParams.toString()}`);
       
       const response = await api.get(`/packages/available?${queryParams.toString()}`);
+      
+      // Log the packages to help with debugging
+      console.log('Received packages:', response.data);
+      
       return response.data;
     } catch (error) {
       console.error('Error fetching packages:', error);

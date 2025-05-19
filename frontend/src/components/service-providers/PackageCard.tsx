@@ -3,7 +3,7 @@ import { Package } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
-import { Users, Calendar, ImageOff } from "lucide-react";
+import { Users, Calendar, ImageOff, Layers } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
@@ -14,6 +14,9 @@ interface PackageCardProps {
 
 export const PackageCard = ({ package: pkg }: PackageCardProps) => {
   const [imageError, setImageError] = useState(false);
+  
+  // Check if this is a combined package
+  const isCombined = pkg.combined === true && pkg.packages && pkg.packages.length > 0;
   
   const providerInfo = pkg.providerInfo || {
     id: "",
@@ -62,14 +65,29 @@ export const PackageCard = ({ package: pkg }: PackageCardProps) => {
             onError={handleImageError}
           />
         )}
+        
+        {/* Combined Package Badge */}
+        {isCombined && (
+          <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-semibold flex items-center">
+            <Layers className="h-3 w-3 mr-1" />
+            Combined Package
+          </div>
+        )}
+        
         <div className="absolute bottom-2 left-2 flex items-center bg-white/90 px-2 py-1 rounded-full">
-          <Avatar className="h-6 w-6 mr-1.5">
-            <AvatarImage src={providerInfo.profileImage || undefined} alt={providerInfo.name} />
-            <AvatarFallback>{providerInfo.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <span className="text-xs font-medium truncate max-w-[140px]">
-            {providerInfo.businessName || providerInfo.name}
-          </span>
+          {isCombined ? (
+            <span className="text-xs font-medium">Multiple Providers</span>
+          ) : (
+            <>
+              <Avatar className="h-6 w-6 mr-1.5">
+                <AvatarImage src={providerInfo.profileImage || undefined} alt={providerInfo.name} />
+                <AvatarFallback>{providerInfo.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium truncate max-w-[140px]">
+                {providerInfo.businessName || providerInfo.name}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -82,9 +100,27 @@ export const PackageCard = ({ package: pkg }: PackageCardProps) => {
             </Badge>
           </div>
 
-          <p className="text-sm text-gray-600 line-clamp-2 h-10">
-            {shortDescription}
-          </p>
+          {isCombined ? (
+            <div className="text-sm text-gray-600">
+              <p className="font-medium mb-1 text-blue-700">Bundle Package - Save {formatCurrency((pkg.packages || []).reduce((acc, p) => acc + p.price, 0) - pkg.price)}</p>
+              <ul className="text-xs list-disc pl-4 space-y-1">
+                {pkg.packages?.map((subPackage, index) => (
+                  <li key={index} className="line-clamp-1 flex justify-between">
+                    <span>{subPackage.name}</span>
+                    <span className="text-gray-500">{formatCurrency(subPackage.price)}</span>
+                  </li>
+                ))}
+                <li className="font-medium border-t pt-1 mt-1 list-none pl-0 flex justify-between">
+                  <span>Total Price:</span>
+                  <span>{formatCurrency(pkg.price)}</span>
+                </li>
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 line-clamp-2 h-10">
+              {shortDescription}
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-500">
             <div className="flex items-center">
@@ -97,6 +133,13 @@ export const PackageCard = ({ package: pkg }: PackageCardProps) => {
                 <span className="text-xs">{pkg.eventTypes.join(", ")}</span>
               </div>
             )}
+            {/* Display services for combined packages */}
+            {isCombined && pkg.serviceTypes && (
+              <div className="flex items-center">
+                <Layers className="h-3.5 w-3.5 mr-1 text-gray-400" />
+                <span className="text-xs">{pkg.serviceTypes.join(" + ")}</span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
@@ -106,7 +149,11 @@ export const PackageCard = ({ package: pkg }: PackageCardProps) => {
           {formatCurrency(pkg.price)} <span className="text-xs font-normal text-gray-500">{pkg.currency}</span>
         </div>
         <Button size="sm" asChild>
-          <Link to={`/service-providers/${providerInfo.id}?tab=packages&packageId=${pkg.id}`}>View Details</Link>
+          {isCombined ? (
+            <Link to={`/packages/combined/${pkg.id}`}>View Bundle</Link>
+          ) : (
+            <Link to={`/service-providers/${providerInfo.id}?tab=packages&packageId=${pkg.id}`}>View Details</Link>
+          )}
         </Button>
       </CardFooter>
     </Card>

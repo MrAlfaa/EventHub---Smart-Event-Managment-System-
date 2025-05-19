@@ -107,13 +107,19 @@ export interface Package {
   crowdSizeMax: number;
   eventTypes: string[];
   status: string;
-  provider_id: string;
+  provider_id?: string;
   providerInfo?: {
     id: string;
     name: string;
     businessName?: string;
-    profileImage?: string;
+    profileImage?: string | null;
+    serviceType?: string;
   };
+  serviceType?: string;
+  // New fields for combined packages
+  combined?: boolean;
+  packages?: Package[];
+  serviceTypes?: string[];
 }
 
 // Event types and categories
@@ -169,12 +175,18 @@ export interface ServiceType {
 // Filter Types
 export interface EventFilter {
   services: string[];
-  budgetRange: { min: number; max: number };
-  crowdRange: { min: number; max: number };
   eventType?: string;
+  budgetRange?: {
+    min: number;
+    max: number;
+  };
+  crowdRange?: {
+    min: number;
+    max: number;
+  };
   location?: string;
   packageFilter?: string | null;
-  packageDisplayMode?: 'individual' | 'grouped'; // Add this new property
+  packageDisplayMode?: 'individual' | 'grouped';
   hotelType?: string;
 }
 // Booking Types
