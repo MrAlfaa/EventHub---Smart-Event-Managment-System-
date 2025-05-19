@@ -11,6 +11,25 @@ export interface User {
 }
 import { ReactNode } from "react";
 
+export interface CartItem {
+  id: string;
+  providerId: string;
+  packageId?: string;
+  name: string;
+  packageName: string;
+  price: number;
+  currency: string;
+  description?: string;
+  profileImage?: string;
+  eventType?: string;
+  capacity?: {
+    min: number;
+    max: number;
+  };
+  quantity: number;
+  selectedDate?: string;
+}
+
 // Service Provider Types
 export interface ServiceProvider {
   id: string;

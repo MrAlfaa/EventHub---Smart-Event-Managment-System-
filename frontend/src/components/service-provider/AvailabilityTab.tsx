@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { CalendarIcon, Loader } from "lucide-react";
+import { Loader, CheckCircle } from "lucide-react";
 import providerService from "@/services/providerService";
 
 interface AvailabilityTabProps {
@@ -26,7 +26,9 @@ export const AvailabilityTab = ({
   onDateSelect, 
   onBookNow 
 }: AvailabilityTabProps) => {
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [date, setDate] = useState<Date | undefined>(
+    selectedDate ? new Date(selectedDate) : undefined
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [unavailableDates, setUnavailableDates] = useState<UnavailableDate[]>([]);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
@@ -77,14 +79,27 @@ export const AvailabilityTab = ({
     return {
       unavailable: unavailableDates
         .filter(d => d.type === 'unavailable' || d.type === 'booked')
-        .map(d => d.date)
+        .map(d => d.date),
+      selected: date ? [date] : []
     };
   };
 
   const handleDateChange = (newDate: Date | undefined) => {
     setDate(newDate);
     if (newDate) {
+      // Check if date is available before selecting
+      const dateString = newDate.toDateString();
+      const unavailable = unavailableDates.some(
+        unavailableDate => unavailableDate.date.toDateString() === dateString
+      );
+      
+      if (unavailable) {
+        toast.error("This date is not available for booking");
+        return;
+      }
+      
       onDateSelect(newDate.toISOString());
+      toast.success("Date selected! Click 'Continue to Packages' to choose a package.");
     }
   };
   
@@ -113,6 +128,11 @@ export const AvailabilityTab = ({
                     backgroundColor: "#fee2e2", 
                     color: "#ef4444",
                     textDecoration: "line-through" 
+                  },
+                  selected: {
+                    backgroundColor: "#dbeafe",
+                    color: "#1e40af",
+                    fontWeight: "bold"
                   }
                 }}
                 footer={
@@ -125,6 +145,10 @@ export const AvailabilityTab = ({
                       <div className="h-3 w-3 rounded-full bg-red-200"></div>
                       <span>Unavailable</span>
                     </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-full bg-blue-200"></div>
+                      <span>Selected</span>
+                    </div>
                   </div>
                 }
               />
@@ -132,7 +156,25 @@ export const AvailabilityTab = ({
           </div>
           
           <div className="flex-1">
-            <div className="mb-4">
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <h4 className="font-medium mb-3">Booking Process</h4>
+              <ol className="space-y-3">
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">1</span>
+                  <span>Select an available date on the calendar</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">2</span>
+                  <span>Click 'Continue to Packages' to browse packages</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">3</span>
+                  <span>Choose a package and proceed to checkout</span>
+                </li>
+              </ol>
+            </div>
+            
+            <div className="mt-4">
               <h4 className="font-medium mb-2">Selected Date</h4>
               {date ? (
                 <>
@@ -159,12 +201,12 @@ export const AvailabilityTab = ({
             </div>
             
             <Button 
-              className="w-full" 
+              className="w-full mt-4" 
               disabled={!date || !isAvailable}
               onClick={onBookNow}
             >
               {!date ? 'Select a Date First' : 
-               !isAvailable ? 'Not Available on This Date' : 'Book Now'}
+               !isAvailable ? 'This Date is Not Available' : 'Continue to Packages'}
             </Button>
             
             <p className="mt-2 text-xs text-gray-500">

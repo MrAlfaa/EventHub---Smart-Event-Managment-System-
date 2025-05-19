@@ -3,7 +3,7 @@ import { ServiceProvider, Package } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ShoppingCart, Calendar, ArrowUpDown, Users, DollarSign } from "lucide-react";
+import { Eye, ShoppingCart,Info, Calendar, ArrowUpDown, Users, DollarSign } from "lucide-react";
 import providerService from "@/services/providerService";
 import { PackageQuickView } from "./PackageQuickView";
 import { toast } from "sonner";
@@ -12,9 +12,10 @@ import { useNavigate } from "react-router-dom";
 
 interface PackagesTabProps {
   provider: ServiceProvider;
+  selectedDate?: string | null;
 }
 
-export const PackagesTab = ({ provider }: PackagesTabProps) => {
+export const PackagesTab = ({ provider, selectedDate }: PackagesTabProps) => {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,24 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
             </div>
           </div>
           
+          {/* Display selected date banner if a date is selected */}
+          {selectedDate && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-3 flex items-center">
+              <Calendar className="h-5 w-5 text-blue-500 mr-2" />
+              <div>
+                <p className="text-blue-700 font-medium">
+                  Selected date: {new Date(selectedDate).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <p className="text-sm text-blue-600">Select a package below to book for this date</p>
+              </div>
+            </div>
+          )}
+          
           {packages && packages.length > 0 ? (
             <div className="space-y-6">
               {sortedPackages.map((pkg) => (
@@ -243,12 +262,24 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Add to Cart
                       </Button>
-                      <Button size="sm" onClick={() => handleBookNow(pkg)}>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleBookNow(pkg)}
+                        className={selectedDate ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
                         <Calendar className="h-4 w-4 mr-2" />
-                        Book Now
+                        {selectedDate ? "Book for Selected Date" : "Book Now"}
                       </Button>
                     </div>
                   </div>
+                  
+                  {/* Show selected date indicator if a date is selected */}
+                  {selectedDate && (
+                    <div className="bg-blue-50 p-2 border-t border-blue-100 text-xs text-blue-600 text-center">
+                      <Info className="h-3 w-3 inline-block mr-1" />
+                      This package will be booked for {new Date(selectedDate).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -270,6 +301,7 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
           onClose={() => setQuickViewOpen(false)}
           onAddToCart={handleAddToCart}
           onBookNow={handleBookNow}
+          selectedDate={selectedDate}
         />
       )}
     </>

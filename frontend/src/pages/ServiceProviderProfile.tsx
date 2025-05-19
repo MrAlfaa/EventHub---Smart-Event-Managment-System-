@@ -1,14 +1,14 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ServiceProvider, Review, Package } from "@/types"; // Added Package import
+import { ServiceProvider, Review ,CartItem } from "@/types"; 
 import { useApp } from "@/providers/AppProvider";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader } from "lucide-react";
 import providerService from "@/services/providerService";
-import reviewService from "@/services/reviewService"; // Add this import
+import reviewService from "@/services/reviewService"; 
 import chatService from "@/services/chatService";
 
 // Import all the components we created
@@ -33,6 +33,8 @@ const ServiceProviderProfile = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("about");
+  const tabsRef = useRef<any>(null);
 
   useEffect(() => {
     const fetchProviderData = async () => {
@@ -84,35 +86,51 @@ const ServiceProviderProfile = () => {
   const handleReviewAdded = (newReview: Review) => {
     setReviews(prev => [newReview, ...prev]);
   };
+  
   const handleAddToCart = () => {
     if (provider) {
+      // Create a CartItem with the correct structure
       const cartItem = {
+        id: provider.id, // Use provider.id as the cart item ID
         providerId: provider.id,
-        providerName: provider.name,
-        businessName: provider.businessName,
-        price: provider.hourlyRate || 0,
-        imageUrl: provider.profileImageUrl,
+        packageId: "", // Empty string as it's not a package
+        name: provider.name || "Service Provider",
+        packageName: "Custom Service", // Default name for non-package service
+        price: provider.pricing?.minPrice || 0, // Use the pricing property from ServiceProvider
+        currency: provider.pricing?.currency || "LKR",
+        description: provider.description || "",
+        profileImage: provider.profileImage,
+        eventType: provider.eventTypes?.[0] || "Service",
         quantity: 1
       };
+      
       addToCart(cartItem);
       toast.success(`${provider.name} added to cart`);
     }
   };
 
+  // Function to switch tabs programmatically
+  const switchToTab = (tabValue: string) => {
+    setActiveTab(tabValue);
+    // If using a ref to access the Tabs component
+    if (tabsRef.current) {
+      // Some tab components have a setValue method
+      if (tabsRef.current.setValue) {
+        tabsRef.current.setValue(tabValue);
+      }
+    }
+  };
+
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date === selectedDate ? null : date);
+  };
+
+  // Updated to switch to packages tab instead of going to checkout
   const handleBookNow = () => {
-    if (provider && selectedDate) {
-      // Add the selected date to the provider object before adding to cart
-      const cartItem = {
-        providerId: provider.id,
-        providerName: provider.name,
-        businessName: provider.businessName,
-        price: provider.hourlyRate || 0,
-        imageUrl: provider.profileImageUrl,
-        quantity: 1,
-        selectedDate
-      };
-      addToCart(cartItem);
-      navigate("/checkout");
+    if (selectedDate) {
+      // Store the selected date and switch to packages tab
+      toast.success("Date selected! Choose a package below.");
+      switchToTab("packages");
     } else {
       toast.error("Please select a date first");
     }
@@ -140,10 +158,6 @@ const ServiceProviderProfile = () => {
         toast.error("Failed to start chat. Please try again.");
       }
     }
-  };
-
-  const handleDateSelect = (date: string) => {
-    setSelectedDate(date === selectedDate ? null : date);
   };
 
   if (loading) {
@@ -193,7 +207,13 @@ const ServiceProviderProfile = () => {
       <div className="container mx-auto px-4 sm:px-6">        
         <div className="my-4 sm:my-8 grid gap-4 sm:gap-8 grid-cols-1 md:grid-cols-3">
           <div className="md:col-span-2">
-            <Tabs defaultValue="about" className="w-full">
+            <Tabs 
+              defaultValue="about" 
+              className="w-full" 
+              value={activeTab} 
+              onValueChange={setActiveTab}
+              ref={tabsRef}
+            >
               <div className="overflow-x-auto pb-2">
                 <TabsList className="w-full justify-start min-w-max">
                   <TabsTrigger value="about">About</TabsTrigger>
@@ -213,7 +233,10 @@ const ServiceProviderProfile = () => {
               </TabsContent>
               
               <TabsContent value="packages" className="mt-4 sm:mt-6">
-                <PackagesTab provider={provider} />
+                <PackagesTab 
+                  provider={provider} 
+                  selectedDate={selectedDate} 
+                />
               </TabsContent>
               
               <TabsContent value="reviews" className="mt-6">
@@ -245,5 +268,3 @@ const ServiceProviderProfile = () => {
 };
 
 export default ServiceProviderProfile;
-
-
