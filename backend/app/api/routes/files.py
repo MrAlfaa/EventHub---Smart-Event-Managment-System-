@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List
 import os
@@ -10,12 +10,49 @@ from app.models.file import FileInDB, FileResponse
 from app.api.deps import get_current_user
 from app.db.mongodb import get_database
 from bson.objectid import ObjectId
+from jose import jwt
+from app.core.config import settings
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.security.utils import get_authorization_scheme_param
+from app.schemas.auth import TokenPayload
 
 router = APIRouter()
+
 # Use an absolute path that works on both Windows and Unix
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 print(f"Upload directory set to: {UPLOAD_DIR}")  # Debug print
+
+# Add this for optional token dependency
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False
+)
+
+async def get_current_user_optional(token: str = Depends(oauth2_scheme_optional)):
+    """Similar to get_current_user but returns None if no valid token instead of raising exception"""
+    if not token:
+        return None
+        
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        token_data = TokenPayload(**payload)
+        
+        db = await get_database()
+        user = await db.users.find_one({"_id": ObjectId(token_data.sub)})
+        
+        if not user:
+            return None
+        
+        if '_id' in user:
+            user['id'] = str(user['_id'])
+        
+        return UserInDB(**user)
+    except:
+        return None
+
 def get_file_type(filename: str) -> str:
     """Determine file type from extension"""
     ext = filename.split('.')[-1].lower()
@@ -103,9 +140,33 @@ async def get_user_files(
 @router.get("/files/{file_id}/download")
 async def download_file(
     file_id: str,
-    current_user: UserInDB = Depends(get_current_user)
+    token: str = Query(None),  # Allow token as query parameter
+    current_user: UserInDB = Depends(get_current_user_optional)  # Use our optional auth
 ):
     db = await get_database()
+    
+    # If token is provided but no current_user, try to get user from token
+    if token and not current_user:
+        try:
+            # Validate token and get user
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            )
+            user_id = payload.get("sub")
+            if user_id:
+                user = await db.users.find_one({"_id": ObjectId(user_id)})
+                if user:
+                    current_user = UserInDB(**user)
+        except:
+            pass
+    
+    # Ensure we have a user now
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     # Get file record
     file = await db.files.find_one({"_id": ObjectId(file_id), "user_id": str(current_user.id)})
@@ -158,4 +219,5 @@ async def delete_file(
     # Delete file record from database
     await db.files.delete_one({"_id": ObjectId(file_id)})
     
+    return {"message": "File deleted successfully"}
     return {"message": "File deleted successfully"}

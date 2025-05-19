@@ -58,7 +58,8 @@ const fileService = {
 
   // Get download URL for a file
   getFileDownloadUrl: (fileId: string): string => {
-    return `${API_URL}/files/${fileId}/download`;
+    const token = localStorage.getItem('eventHub_token');
+    return `${API_URL}/files/${fileId}/download${token ? `?token=${token}` : ''}`;
   },
 
   // Delete a file

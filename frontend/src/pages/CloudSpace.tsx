@@ -66,8 +66,10 @@ const CloudSpace = () => {
   
   const handleDownload = (fileId: string, fileName: string) => {
     try {
-      // Create a link and trigger download
+      // Get the download URL with token
       const downloadUrl = fileService.getFileDownloadUrl(fileId);
+      
+      // Create a link and trigger download
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.setAttribute('download', fileName);
