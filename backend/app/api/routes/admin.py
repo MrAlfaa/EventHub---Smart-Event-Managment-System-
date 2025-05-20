@@ -11,6 +11,7 @@ from bson.objectid import ObjectId
 import cloudinary
 import cloudinary.uploader
 from app.core.config import settings
+from app.utils.email import send_approval_email, send_rejection_email
 
 router = APIRouter()
 
@@ -150,6 +151,14 @@ async def approve_service_provider(
             detail="Service provider profile not found"
         )
     
+    # Get the user to access their email
+    user = await db.users.find_one({"_id": ObjectId(provider_profile["user_id"])})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
     # Update the profile status
     result = await db.service_provider_profiles.update_one(
         {"_id": ObjectId(provider_id)},
@@ -176,7 +185,19 @@ async def approve_service_provider(
         }}
     )
     
-    return {"message": "Service provider approved successfully"}
+    # Send approval email
+    business_name = provider_profile.get("business_name", "Your Business")
+    provider_name = provider_profile.get("provider_name", user.get("name", "Service Provider"))
+    email_sent = send_approval_email(
+        email=user.get("email"),
+        business_name=business_name,
+        provider_name=provider_name
+    )
+    
+    return {
+        "message": "Service provider approved successfully",
+        "email_sent": email_sent
+    }
 
 @router.post("/admin/service-providers/{provider_id}/reject", response_model=dict)
 async def reject_service_provider(
@@ -193,6 +214,14 @@ async def reject_service_provider(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Service provider profile not found"
+        )
+    
+    # Get the user to access their email
+    user = await db.users.find_one({"_id": ObjectId(provider_profile["user_id"])})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
         )
     
     # Update the profile status
@@ -222,7 +251,20 @@ async def reject_service_provider(
         }}
     )
     
-    return {"message": "Service provider rejected successfully"}
+    # Send rejection email
+    business_name = provider_profile.get("business_name", "Your Business")
+    provider_name = provider_profile.get("provider_name", user.get("name", "Service Provider"))
+    email_sent = send_rejection_email(
+        email=user.get("email"),
+        business_name=business_name,
+        provider_name=provider_name,
+        reason=action.reason or "No specific reason provided."
+    )
+    
+    return {
+        "message": "Service provider rejected successfully",
+        "email_sent": email_sent
+    }
 
 @router.get("/admin/users", response_model=List[dict])
 async def get_all_users(

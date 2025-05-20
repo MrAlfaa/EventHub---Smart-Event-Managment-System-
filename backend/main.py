@@ -92,7 +92,13 @@ async def check_upcoming_events():
 @app.on_event("startup")
 async def startup_db_client():
     await connect_to_mongo()
-    print("Connected to MongoDB!")  # Add debug print
+    print("Connected to MongoDB!")
+    
+    # Validate email configuration
+    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        print("Email configuration found.")
+    else:
+        print("Warning: Email configuration incomplete. Email notifications may not work.")
     
     # Start background task for event reminders
     asyncio.create_task(check_upcoming_events())
