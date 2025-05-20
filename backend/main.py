@@ -2,7 +2,7 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import users, auth, providers, admin, promotions, reviews, chat, bookings, provider_bookings, packages
-from app.api.routes import files, cloud_storage, notifications  # Add notifications import
+from app.api.routes import files, cloud_storage, notifications, provider_stats  # Add provider_stats import
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 from app.db.mongodb import get_database
 import asyncio
@@ -120,7 +120,11 @@ app.include_router(provider_bookings.router, prefix=settings.API_V1_STR)
 app.include_router(packages.router, prefix=settings.API_V1_STR)
 app.include_router(files.router, prefix=settings.API_V1_STR)
 app.include_router(cloud_storage.router, prefix=settings.API_V1_STR)
-app.include_router(notifications.router, prefix=settings.API_V1_STR)  # Add notifications router
+app.include_router(notifications.router, prefix=settings.API_V1_STR)
+app.include_router(provider_stats.router, prefix=settings.API_V1_STR)  # Add this line
+
+# Ensure providers router is included - add this line explicitly
+app.include_router(providers.router, prefix=settings.API_V1_STR)
 
 # Add debug route at root level
 @app.get("/debug-routes")

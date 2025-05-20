@@ -6,6 +6,7 @@
   import { formatCurrency } from "@/lib/utils";
   import { Skeleton } from "@/components/ui/skeleton";
   import { formatDate } from "@/utils/dateUtils";
+  import { toast } from "sonner";
 
   // Define types for our dashboard stats
   interface DashboardStats {
@@ -28,16 +29,35 @@
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const MOCK_DASHBOARD_DATA = {
+      total_packages: 12,
+      active_bookings: 28,
+      total_customers: 145, 
+      total_revenue: 12450,
+      recent_bookings: [
+        { id: "bk1001", customerName: "John Doe", packageName: "Wedding Deluxe", date: new Date().toISOString(), status: "pending" },
+        { id: "bk1002", customerName: "Jane Smith", packageName: "Birthday Basic", date: new Date().toISOString(), status: "confirmed" },
+        { id: "bk1003", customerName: "Robert Johnson", packageName: "Corporate Event", date: new Date().toISOString(), status: "completed" }
+      ]
+    };
+
     useEffect(() => {
       const fetchStats = async () => {
         try {
           setLoading(true);
           const data = await providerStatsService.getDashboardStats();
+          console.log('Received stats data:', data);
           setStats(data);
           setError(null);
         } catch (err) {
           console.error("Error fetching dashboard stats:", err);
-          setError("Failed to load dashboard statistics");
+          // Use mock data if API fails
+          console.log("Using mock data as fallback");
+          setStats(MOCK_DASHBOARD_DATA);
+          // setError("Could not load real data - showing sample data instead");
+        
+          // Show a toast notification for better UX
+          toast.error("Could not load dashboard statistics - showing sample data");
         } finally {
           setLoading(false);
         }
