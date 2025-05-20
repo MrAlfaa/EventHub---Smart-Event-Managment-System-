@@ -1,2 +1,2 @@
-export * from "./BookingsDetailsTab";
-export * from "./ManageAvailabilityTab";
+export { BookingsDetailsTab } from './BookingsDetailsTab';
+export { ManageAvailabilityTab } from './ManageAvailabilityTab';

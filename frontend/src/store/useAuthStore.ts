@@ -1,5 +1,5 @@
   import { create } from 'zustand';
-  import { User } from '@/types';
+  import { User } from '@/types/index';
   import userService from '../services/userService';
   import authService, { LoginCredentials, RegisterUserData, RegisterServiceProviderData } from '@/services/authService';
 

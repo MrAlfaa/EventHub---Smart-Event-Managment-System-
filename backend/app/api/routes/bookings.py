@@ -6,6 +6,7 @@ from app.models.user import UserInDB
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 from typing import List
+from app.models.notification import NotificationCreate
 
 router = APIRouter()
 
@@ -22,6 +23,13 @@ async def create_booking(
     new_booking["userId"] = str(current_user.id)
     new_booking["status"] = "pending"  # Initial status is pending
     new_booking["createdAt"] = datetime.utcnow()
+    
+    # Make sure providerId is included for provider-side lookups
+    if "providerId" not in new_booking or not new_booking["providerId"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provider ID is required"
+        )
     
     # Add payment information
     new_booking["payments"] = [{
@@ -41,13 +49,34 @@ async def create_booking(
     # Get the inserted booking
     booking = await db.bookings.find_one({"_id": result.inserted_id})
     
-    # Convert ObjectId to string - IMPORTANT FIX
+    # Try to get package name from the packageId
+    package_name = "your service"
+    if "packageId" in new_booking:
+        package = await db.provider_packages.find_one({"_id": ObjectId(new_booking["packageId"])})
+        if package and "name" in package:
+            package_name = package["name"]
+    
+    # Create notification for provider
+    notification = {
+        "recipient_id": booking_data.providerId,
+        "type": "booking",
+        "title": "New Booking Request",
+        "message": f"{current_user.name} has requested {package_name} for {booking_data.eventDate.strftime('%B %d, %Y')}",
+        "reference_id": str(booking["_id"]),
+        "reference_type": "booking",
+        "is_read": False,
+        "created_at": datetime.utcnow()
+    }
+    
+    # Insert notification
+    await db.notifications.insert_one(notification)
+    
+    # Convert ObjectId to string
     if booking:
         booking["id"] = str(booking["_id"])
-        del booking["_id"]  # Remove the ObjectId to prevent serialization issues
+        del booking["_id"]
     
     return booking
-
 @router.get("/bookings/user", response_model=List[dict])
 async def get_user_bookings(current_user: UserInDB = Depends(get_current_user)):
     """Get all bookings for the current user"""

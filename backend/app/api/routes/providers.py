@@ -1235,6 +1235,7 @@ async def get_provider_gallery(provider_id: str):
 
 
 @router.get("/providers/{provider_id}/packages", response_model=list)
+@router.get("/providers/{provider_id}/packages", response_model=list)
 async def get_provider_packages_by_id(provider_id: str):
     """Get all packages for a specific service provider by ID"""
     db = await get_database()
@@ -1288,3 +1289,204 @@ async def get_provider_packages_by_id(provider_id: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid provider ID format"
         )
+
+
+@router.get("/providers/{provider_id}/booked-dates", response_model=dict)
+async def get_provider_booked_dates(provider_id: str):
+    """Get the dates when a provider is booked/unavailable (public endpoint)"""
+    try:
+        db = await get_database()
+        
+        # Check if provider exists and is approved
+        provider = await db.users.find_one({
+            "_id": ObjectId(provider_id),
+            "role": "service_provider",
+            "approval_status": "approved"
+        })
+        
+        if not provider:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service provider not found or not approved"
+            )
+        
+        # Get all pending and confirmed bookings for this provider
+        cursor = db.bookings.find({
+            "providerId": provider_id,
+            "status": {"$in": ["pending", "confirmed"]}
+        })
+        bookings = await cursor.to_list(length=100)
+        
+        # Extract event dates
+        booked_dates = []
+        for booking in bookings:
+            if "eventDate" in booking:
+                booked_dates.append({
+                    "date": booking["eventDate"].isoformat(),
+                    "type": "booked"
+                })
+        
+        return {"bookedDates": booked_dates}
+        
+    except (ValueError, InvalidId):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid provider ID format"
+        )
+
+
+@router.get("/packages/available", response_model=list)
+async def get_all_available_packages(
+    eventType: Optional[str] = None,
+    minPrice: Optional[int] = None,
+    maxPrice: Optional[int] = None,
+    crowdSize: Optional[int] = None,
+    serviceType: Optional[str] = None,
+):
+    """Get all available packages with optional filtering"""
+    db = await get_database()
+    
+    # Base query
+    query = {"status": "active"}
+    
+    # Apply filters
+    if eventType:
+        query["eventTypes"] = {"$in": [eventType]}
+    
+    if minPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$gte"] = minPrice
+    
+    if maxPrice is not None:
+        query["price"] = query.get("price", {})
+        query["price"]["$lte"] = maxPrice
+    
+    if crowdSize is not None:
+        query["$and"] = [
+            {"crowdSizeMin": {"$lte": crowdSize}},
+            {"crowdSizeMax": {"$gte": crowdSize}}
+        ]
+    
+    # Get approved service provider IDs for packages filtering
+    approved_providers_cursor = db.users.find(
+        {"role": "service_provider", "approval_status": "approved"},
+        {"_id": 1}
+    )
+    approved_provider_ids = [str(p["_id"]) for p in await approved_providers_cursor.to_list(length=None)]
+    
+    # Only include packages from approved providers
+    query["provider_id"] = {"$in": approved_provider_ids}
+    
+    # If service type is provided, find matching providers first
+    if serviceType:
+        provider_profiles_cursor = db.service_provider_profiles.find(
+            {"service_types": {"$regex": serviceType, "$options": "i"}},
+            {"user_id": 1}
+        )
+        matching_provider_ids = [p["user_id"] for p in await provider_profiles_cursor.to_list(length=None)]
+        
+        # Update query to only include packages from these providers
+        query["provider_id"] = {"$in": matching_provider_ids}
+    
+    # Get packages with the query
+    packages_cursor = db.provider_packages.find(query)
+    packages = await packages_cursor.to_list(length=None)
+    
+    # For each package, get provider info and format response
+    result = []
+    
+    for package in packages:
+        # Convert ObjectId to string
+        package["id"] = str(package.pop("_id"))
+        
+        # Get provider info
+        provider = await db.users.find_one({"_id": ObjectId(package["provider_id"])})
+        if provider:
+            provider_profile = await db.service_provider_profiles.find_one({"user_id": str(provider["_id"])})
+            
+            provider_info = {
+                "id": str(provider["_id"]),
+                "name": provider.get("name", ""),
+                "role": provider.get("role", ""),
+                "businessName": provider_profile.get("business_name") if provider_profile else "",
+                "profileImage": provider_profile.get("profile_picture_url") if provider_profile else None,
+            }
+            
+            package["providerInfo"] = provider_info
+        
+        result.append(package)
+    
+    return result
+
+@router.get("/providers/dashboard-stats", response_model=dict)
+async def get_provider_dashboard_stats(current_user: UserInDB = Depends(get_current_user)):
+    """Get provider dashboard statistics"""
+    if current_user.role != "service_provider" and current_user.role != "admin" and current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only service providers can access their dashboard stats"
+        )
+    
+    db = await get_database()
+    
+    # Get total packages count
+    total_packages = await db.provider_packages.count_documents({"provider_id": str(current_user.id)})
+    
+    # Get active bookings count
+    active_bookings = await db.bookings.count_documents({
+        "providerId": str(current_user.id),
+        "status": {"$in": ["pending", "confirmed"]}
+    })
+    
+    # Get unique customers count
+    customers_pipeline = [
+        {"$match": {"providerId": str(current_user.id)}},
+        {"$group": {"_id": "$userId"}},
+        {"$count": "total"}
+    ]
+    customers_agg = await db.bookings.aggregate(customers_pipeline).to_list(length=1)
+    total_customers = customers_agg[0]["total"] if customers_agg else 0
+    
+    # Get total revenue
+    revenue_pipeline = [
+        {"$match": {"providerId": str(current_user.id), "status": {"$in": ["confirmed", "completed"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$totalAmount"}}}
+    ]
+    revenue_agg = await db.bookings.aggregate(revenue_pipeline).to_list(length=1)
+    total_revenue = revenue_agg[0]["total"] if revenue_agg else 0
+    # Get recent bookings
+    recent_bookings_cursor = db.bookings.find(
+        {"providerId": str(current_user.id)}
+    ).sort("createdAt", -1).limit(5)
+    
+    recent_bookings = []
+    async for booking in recent_bookings_cursor:
+        # Get customer info
+        customer = None
+        if "userId" in booking:
+            customer = await db.users.find_one({"_id": ObjectId(booking["userId"])})
+        
+        # Get package info
+        package_name = "Custom Package"
+        if "packageId" in booking:
+            package = await db.provider_packages.find_one({"_id": ObjectId(booking["packageId"])})
+            if package:
+                package_name = package.get("name", "Custom Package")
+        
+        # Format booking data
+        booking_data = {
+            "id": str(booking["_id"]),
+            "customerName": customer.get("name", "Unknown Customer") if customer else "Unknown Customer",
+            "packageName": package_name,
+            "date": booking.get("eventDate", booking.get("createdAt", datetime.utcnow())),
+            "status": booking.get("status", "pending")
+        }
+        recent_bookings.append(booking_data)
+    
+    return {
+        "total_packages": total_packages,
+        "active_bookings": active_bookings,
+        "total_customers": total_customers,
+        "total_revenue": total_revenue,
+        "recent_bookings": recent_bookings
+    }

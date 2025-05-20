@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, Depends, status, Body
 from typing import List, Optional
 from app.models.user import UserInDB
@@ -99,6 +98,90 @@ async def get_provider_reviews(provider_id: str):
     
     return reviews
 
+@router.put("/reviews/{review_id}", status_code=status.HTTP_200_OK)
+async def update_review(
+    review_id: str,
+    review_data: dict = Body(...),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Update an existing review"""
+    # Extract data from the request body
+    rating = review_data.get("rating")
+    comment = review_data.get("comment")
+    serviceProviderId = review_data.get("serviceProviderId")
+    
+    # Validate required fields
+    if not rating or not comment or not serviceProviderId:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="rating, comment, and serviceProviderId are required"
+        )
+    
+    if not isinstance(rating, int) or rating < 1 or rating > 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rating must be an integer between 1 and 5"
+        )
+    
+    db = await get_database()
+    
+    # Find the review
+    try:
+        review = await db.reviews.find_one({"_id": ObjectId(review_id)})
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid review ID format"
+        )
+        
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Review not found"
+        )
+    
+    # Check if the review belongs to the current user
+    if review["userId"] != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update your own reviews"
+        )
+    
+    # Make sure the service provider ID hasn't changed
+    if review["serviceProviderId"] != serviceProviderId:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change the service provider for an existing review"
+        )
+    
+    # Update the review
+    update_result = await db.reviews.update_one(
+        {"_id": ObjectId(review_id)},
+        {"$set": {
+            "rating": rating,
+            "comment": comment,
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    
+    if update_result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update review or no changes made"
+        )
+    
+    # Get the updated review
+    updated_review = await db.reviews.find_one({"_id": ObjectId(review_id)})
+    updated_review["id"] = str(updated_review["_id"])
+    del updated_review["_id"]
+    
+    # Get provider name
+    provider = await db.users.find_one({"_id": ObjectId(updated_review["serviceProviderId"])})
+    if provider:
+        updated_review["providerName"] = provider.get("name", "Unknown Provider")
+    
+    return updated_review
+
 @router.post("/reviews/{review_id}/reply", status_code=status.HTTP_200_OK)
 async def reply_to_review(
     review_id: str,
@@ -181,5 +264,4 @@ async def get_user_reviews(current_user: UserInDB = Depends(get_current_user)):
         if provider:
             review["providerName"] = provider.get("name", "Unknown Provider")
     
-    return reviews
     return reviews

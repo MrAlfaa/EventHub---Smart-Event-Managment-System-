@@ -71,38 +71,23 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden rounded-xl">
-        {/* Colorful header section */}
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg p-0">
+        {/* Colorful header section - make it more compact */}
         <div className={`
-          p-6 text-white relative overflow-hidden
-          ${booking.status === 'pending' ? 'bg-gradient-to-r from-amber-500 to-yellow-600' : 
-            booking.status === 'completed' ? 'bg-gradient-to-r from-blue-500 to-cyan-600' :
-            'bg-gradient-to-r from-red-500 to-rose-600'}
+          p-4 text-white relative
+          ${booking.status === 'pending' ? 'bg-amber-500' : 
+            booking.status === 'completed' ? 'bg-blue-500' :
+            'bg-red-500'}
         `}>
-          {/* Background pattern */}
-          <div className="absolute top-0 right-0 w-64 h-64 opacity-20">
-            <svg viewBox="0 0 100 100" fill="currentColor">
-              <circle cx="80" cy="20" r="15" />
-              <circle cx="10" cy="40" r="5" />
-              <circle cx="40" cy="70" r="10" />
-              <circle cx="70" cy="50" r="8" />
-            </svg>
-          </div>
-          
           <DialogHeader className="text-white p-0">
             <div className="flex items-center justify-between">
               <div>
-                <Badge className={`
-                  mb-3 px-3 py-1 text-xs font-medium border-0
-                  ${booking.status === 'pending' ? 'bg-white/20' : 
-                    booking.status === 'completed' ? 'bg-white/20' :
-                    'bg-white/20'}
-                `}>
+                <Badge className="mb-2 px-2 py-0.5 text-xs font-medium bg-white/20 border-0">
                   {booking.status === 'pending' ? 'UPCOMING EVENT' : 
                    booking.status === 'completed' ? 'COMPLETED EVENT' :
                    'CANCELLED EVENT'}
                 </Badge>
-                <DialogTitle className="text-2xl font-bold">
+                <DialogTitle className="text-xl font-bold">
                   Booking {booking.bookingId}
                 </DialogTitle>
                 <DialogDescription className="text-white/90 mt-1">
@@ -111,16 +96,16 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
               </div>
               
               <div className="text-right">
-                <div className="text-4xl font-bold">${booking.fullAmount}</div>
-                <div className="text-white/80 text-sm">
+                <div className="text-2xl font-bold">${booking.fullAmount}</div>
+                <div className="text-white/80 text-xs">
                   ${booking.advanceAmount} advanced payment
                 </div>
               </div>
             </div>
             
             {booking.status === 'pending' && (
-              <div className="mt-4 flex items-center bg-white/20 rounded-lg p-2 pl-3">
-                <Calendar className="h-5 w-5 mr-2" />
+              <div className="mt-2 flex items-center bg-white/20 rounded-md p-1 pl-2 text-xs">
+                <Calendar className="h-3 w-3 mr-1" />
                 <span className="font-medium">
                   {diffDays} {diffDays === 1 ? 'day' : 'days'} until event
                 </span>
@@ -129,67 +114,67 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
           </DialogHeader>
         </div>
         
-        {/* Content section */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Content section - make it more compact */}
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer Information */}
-            <div className="space-y-5">
-              <div className="flex items-center pb-2 mb-2 border-b border-gray-200">
-                <User className="h-5 w-5 mr-2 text-gray-500" />
-                <h3 className="font-semibold text-lg">Customer Details</h3>
+            <div className="space-y-3">
+              <div className="flex items-center pb-1 mb-1 border-b border-gray-200">
+                <User className="h-4 w-4 mr-2 text-gray-500" />
+                <h3 className="font-semibold text-base">Customer Details</h3>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-2 text-sm">
                 <div className="flex items-start">
-                  <div className="bg-blue-100 p-2 rounded-full mr-3">
-                    <User className="h-4 w-4 text-blue-700" />
+                  <div className="bg-blue-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <User className="h-3.5 w-3.5 text-blue-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Customer Name</p>
+                    <p className="text-xs text-gray-500">Customer Name</p>
                     <p className="font-medium">{booking.fullDetails.nameWithInitial}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-blue-100 p-2 rounded-full mr-3">
-                    <FileText className="h-4 w-4 text-blue-700" />
+                  <div className="bg-blue-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <FileText className="h-3.5 w-3.5 text-blue-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">NIC Number</p>
+                    <p className="text-xs text-gray-500">NIC Number</p>
                     <p className="font-medium">{booking.fullDetails.nicNumber}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-blue-100 p-2 rounded-full mr-3">
-                    <Phone className="h-4 w-4 text-blue-700" />
+                  <div className="bg-blue-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <Phone className="h-3.5 w-3.5 text-blue-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Phone</p>
+                    <p className="text-xs text-gray-500">Phone</p>
                     <p className="font-medium">{booking.fullDetails.phoneNumber}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-blue-100 p-2 rounded-full mr-3">
-                    <Mail className="h-4 w-4 text-blue-700" />
+                  <div className="bg-blue-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <Mail className="h-3.5 w-3.5 text-blue-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Email</p>
+                    <p className="text-xs text-gray-500">Email</p>
                     <p className="font-medium">{booking.fullDetails.email}</p>
                   </div>
                 </div>
                 
                 {booking.fullDetails.eventCoordinatorName && (
                   <div className="flex items-start">
-                    <div className="bg-green-100 p-2 rounded-full mr-3">
-                      <User className="h-4 w-4 text-green-700" />
+                    <div className="bg-green-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                      <User className="h-3.5 w-3.5 text-green-700" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Event Coordinator</p>
+                      <p className="text-xs text-gray-500">Event Coordinator</p>
                       <p className="font-medium">{booking.fullDetails.eventCoordinatorName}</p>
                       {booking.fullDetails.eventCoordinatorNumber && (
-                        <p className="text-sm text-blue-600">{booking.fullDetails.eventCoordinatorNumber}</p>
+                        <p className="text-xs text-blue-600">{booking.fullDetails.eventCoordinatorNumber}</p>
                       )}
                     </div>
                   </div>
@@ -198,46 +183,46 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
             </div>
             
             {/* Event Details */}
-            <div className="space-y-5">
-              <div className="flex items-center pb-2 mb-2 border-b border-gray-200">
-                <Calendar className="h-5 w-5 mr-2 text-gray-500" />
-                <h3 className="font-semibold text-lg">Event Details</h3>
+            <div className="space-y-3">
+              <div className="flex items-center pb-1 mb-1 border-b border-gray-200">
+                <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                <h3 className="font-semibold text-base">Event Details</h3>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-2 text-sm">
                 <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-full mr-3">
-                    <Package className="h-4 w-4 text-purple-700" />
+                  <div className="bg-purple-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <Package className="h-3.5 w-3.5 text-purple-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Package</p>
+                    <p className="text-xs text-gray-500">Package</p>
                     <p className="font-medium">{booking.packageName}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-full mr-3">
-                    <FileText className="h-4 w-4 text-purple-700" />
+                  <div className="bg-purple-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <FileText className="h-3.5 w-3.5 text-purple-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Event Type</p>
+                    <p className="text-xs text-gray-500">Event Type</p>
                     <p className="font-medium">{booking.fullDetails.eventType}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-full mr-3">
-                    <MapPin className="h-4 w-4 text-purple-700" />
+                  <div className="bg-purple-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <MapPin className="h-3.5 w-3.5 text-purple-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Event Location</p>
+                    <p className="text-xs text-gray-500">Event Location</p>
                     <p className="font-medium">{booking.fullDetails.eventLocation.name}</p>
                     {booking.fullDetails.eventLocation.mapLink && (
                       <a 
                         href={booking.fullDetails.eventLocation.mapLink} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline flex items-center mt-1 text-sm"
+                        className="text-blue-600 hover:underline flex items-center mt-1 text-xs"
                       >
                         <LinkIcon className="h-3 w-3 mr-1" />
                         View on Google Maps
@@ -247,21 +232,21 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-full mr-3">
-                    <Users className="h-4 w-4 text-purple-700" />
+                  <div className="bg-purple-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <Users className="h-3.5 w-3.5 text-purple-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Crowd Size</p>
+                    <p className="text-xs text-gray-500">Crowd Size</p>
                     <p className="font-medium">{booking.fullDetails.crowdSize} people</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-full mr-3">
-                    <Home className="h-4 w-4 text-purple-700" />
+                  <div className="bg-purple-100 p-1.5 rounded-md mr-2 flex-shrink-0">
+                    <Home className="h-3.5 w-3.5 text-purple-700" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Address</p>
+                    <p className="text-xs text-gray-500">Address</p>
                     <p className="font-medium">{booking.fullDetails.address}</p>
                   </div>
                 </div>
@@ -271,69 +256,68 @@ export const BookingDetailsDialog: React.FC<BookingDetailsDialogProps> = ({
           
           {/* Additional Notes Section */}
           {booking.fullDetails.additionalNotes && (
-            <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
-              <h3 className="flex items-center font-medium text-lg mb-3 text-amber-800">
-                <StickyNote className="h-5 w-5 mr-1" />
+            <div className="mt-4 p-3 bg-amber-50 rounded-md border border-amber-100">
+              <h3 className="flex items-center font-medium text-base mb-2 text-amber-800">
+                <StickyNote className="h-4 w-4 mr-1" />
                 Additional Notes
               </h3>
-              <p className="text-gray-700 whitespace-pre-line">{booking.fullDetails.additionalNotes}</p>
+              <p className="text-gray-700 whitespace-pre-line text-sm">{booking.fullDetails.additionalNotes}</p>
             </div>
           )}
           
           {/* Payment Information */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
-            <h3 className="flex items-center font-medium text-lg mb-3">
-              <DollarSign className="h-5 w-5 mr-1" />
+          <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-100">
+            <h3 className="flex items-center font-medium text-base mb-2">
+              <DollarSign className="h-4 w-4 mr-1" />
               Payment Information
             </h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-3 bg-white rounded-md shadow-sm">
-                <p className="text-sm text-gray-500">Full Amount</p>
-                <p className="text-xl font-bold">${booking.fullAmount}</p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 bg-white rounded-md shadow-sm">
+                <p className="text-xs text-gray-500">Full Amount</p>
+                <p className="text-base font-bold">${booking.fullAmount}</p>
               </div>
-              <div className="p-3 bg-white rounded-md shadow-sm">
-                <p className="text-sm text-gray-500">Advanced Payment</p>
-                <p className="text-xl font-bold text-green-600">${booking.advanceAmount}</p>
+              <div className="p-2 bg-white rounded-md shadow-sm">
+                <p className="text-xs text-gray-500">Advanced</p>
+                <p className="text-base font-bold text-green-600">${booking.advanceAmount}</p>
               </div>
-              <div className="p-3 bg-blue-50 rounded-md shadow-sm">
-                <p className="text-sm text-gray-500">Balance Due</p>
-                <p className="text-xl font-bold text-blue-600">${booking.fullAmount - booking.advanceAmount}</p>
+              <div className="p-2 bg-blue-50 rounded-md shadow-sm">
+                <p className="text-xs text-gray-500">Balance</p>
+                <p className="text-base font-bold text-blue-600">${booking.fullAmount - booking.advanceAmount}</p>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Footer with actions */}
-        <DialogFooter className="flex-col sm:flex-row gap-2 px-6 py-4 border-t bg-gray-50">
+        {/* Footer with actions - make buttons more compact */}
+        <DialogFooter className="flex-col sm:flex-row gap-2 px-4 py-3 border-t bg-gray-50">
           {booking.status === 'pending' && (
             <>
               <Button 
                 variant="default" 
-                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                className="bg-green-600 hover:bg-green-700 h-9 text-sm"
                 onClick={handleMarkAsPaid}
               >
-                <Check className="h-4 w-4 mr-2" />
-                Mark as Fully Paid
+                <Check className="h-3.5 w-3.5 mr-1" />
+                Mark Paid
               </Button>
               <Button 
                 variant="destructive"
-                className="w-full sm:w-auto"
+                className="h-9 text-sm"
                 onClick={handleCancelBooking}
               >
-                <X className="h-4 w-4 mr-2" />
-                Cancel Booking
+                <X className="h-3.5 w-3.5 mr-1" />
+                Cancel
               </Button>
             </>
           )}
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
-            className="w-full sm:w-auto"
+            className="h-9 text-sm"
           >
             Close
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-};
+  ) };

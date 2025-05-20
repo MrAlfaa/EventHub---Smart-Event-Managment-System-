@@ -5,7 +5,7 @@ import { Package } from '@/types'; // Add this import for Package type
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Create an axios instance
-const providerApi = axios.create({
+const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -13,7 +13,7 @@ const providerApi = axios.create({
 });
 
 // Add request interceptor to attach token
-providerApi.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('eventHub_token');
     if (token) {
@@ -67,7 +67,7 @@ const providerService = {
       formData.append('images', image);
     });
 
-    const response = await providerApi.post('/providers/gallery/upload', formData, {
+    const response = await api.post('/providers/gallery/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -77,53 +77,53 @@ const providerService = {
 
   // Get provider gallery images
   getGalleryImages: async (): Promise<string[]> => {
-    const response = await providerApi.get('/providers/gallery');
+    const response = await api.get('/providers/gallery');
     return response.data.images;
   },
 
   // Delete a gallery image
   deleteGalleryImage: async (imageUrl: string): Promise<void> => {
     // Using query parameter instead of request body for DELETE
-    await providerApi.delete(`/providers/gallery/image?imageUrl=${encodeURIComponent(imageUrl)}`);
+    await api.delete(`/providers/gallery/image?imageUrl=${encodeURIComponent(imageUrl)}`);
   },
 
   // Get provider profile
   getProviderProfile: async () => {
-    const response = await providerApi.get('/providers/me');
+    const response = await api.get('/providers/me');
     return response.data;
   },
 
   // Update provider profile
   updateProviderProfile: async (profileData: any) => {
-    const response = await providerApi.put('/providers/me', profileData);
+    const response = await api.put('/providers/me', profileData);
     return response.data;
   },
 
   // Get provider payment cards
   getProviderCards: async () => {
-    const response = await providerApi.get('/providers/cards');
+    const response = await api.get('/providers/cards');
     return response.data;
   },
 
   // Add new payment card
   addProviderCard: async (cardData: any) => {
-    const response = await providerApi.post('/providers/cards', cardData);
+    const response = await api.post('/providers/cards', cardData);
     return response.data;
   },
 
   // Update payment card
   updateProviderCard: async (cardId: string, cardData: any) => {
-    const response = await providerApi.put(`/providers/cards/${cardId}`, cardData);
+    const response = await api.put(`/providers/cards/${cardId}`, cardData);
     return response.data;
   },
 
   // Delete payment card
   deleteProviderCard: async (cardId: string) => {
-    const response = await providerApi.delete(`/providers/cards/${cardId}`);
+    const response = await api.delete(`/providers/cards/${cardId}`);
     return response.data;
   },
   
-  // Add this new function to fetch approved service providers
+  // Get approved service providers
   getApprovedProviders: async (filters: { eventType?: string; services?: string[]; location?: string } = {}) => {
     try {
       const queryParams = new URLSearchParams();
@@ -135,7 +135,7 @@ const providerService = {
       
       console.log(`Fetching providers with URL: ${API_URL}/providers/approved?${queryParams.toString()}`);
       
-      const response = await providerApi.get(`/providers/approved?${queryParams.toString()}`);
+      const response = await api.get(`/providers/approved?${queryParams.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching approved providers:', error);
@@ -151,7 +151,7 @@ const providerService = {
   // Get provider by ID 
   getProviderById: async (id: string): Promise<ServiceProvider> => {
     try {
-      const response = await providerApi.get(`/providers/${id}`);
+      const response = await api.get(`/providers/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching provider details:', error);
@@ -166,7 +166,7 @@ const providerService = {
   // Get provider gallery
   getProviderGallery: async (id: string): Promise<string[]> => {
     try {
-      const response = await providerApi.get(`/providers/${id}/gallery`);
+      const response = await api.get(`/providers/${id}/gallery`);
       return response.data.images || [];
     } catch (error) {
       console.error('Error fetching provider gallery:', error);
@@ -180,7 +180,7 @@ const providerService = {
   
   getProviderPackages: async (providerId: string): Promise<Package[]> => {
     try {
-      const response = await providerApi.get(`/providers/${providerId}/packages`);
+      const response = await api.get(`/providers/${providerId}/packages`);
       return response.data;
     } catch (error) {
       console.error('Error fetching provider packages:', error);
@@ -190,5 +190,31 @@ const providerService = {
       }
       throw error;
     }
-  },};
+  },
+
+  // Function to check provider availability for specific dates
+  getProviderAvailability: async (providerId: string) => {
+    try {
+      // First, try to get any unavailable dates the provider has set
+      const response = await api.get(`/providers/${providerId}/availability`);
+      
+      // If the endpoint doesn't exist yet, we'll handle the error gracefully
+      // and implement a fallback by fetching their bookings
+      return response.data.specialDates || [];
+    } catch (error) {
+      console.error("Error fetching provider availability:", error);
+      
+      // Fallback - fetch bookings to determine unavailable dates
+      try {
+        // This would be a public endpoint to get booked dates (without details)
+        const bookingsResponse = await api.get(`/providers/${providerId}/booked-dates`);
+        return bookingsResponse.data.bookedDates || [];
+      } catch (fallbackError) {
+        console.error("Error with fallback availability check:", fallbackError);
+        return []; // Return empty array as default
+      }
+    }
+  },
+};
+
 export default providerService;

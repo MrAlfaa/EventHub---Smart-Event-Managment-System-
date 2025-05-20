@@ -9,7 +9,26 @@ export interface User {
   address?: string;  // Add the address property
   role: 'user' | 'service_provider' | 'admin' | 'super_admin';
 }
-import { ReactNode } from "react";
+
+
+export interface CartItem {
+  id: string;
+  providerId: string;
+  packageId?: string;
+  name: string;
+  packageName: string;
+  price: number;
+  currency: string;
+  description?: string;
+  profileImage?: string;
+  eventType?: string;
+  capacity?: {
+    min: number;
+    max: number;
+  };
+  quantity: number;
+  selectedDate?: string;
+}
 
 // Service Provider Types
 export interface ServiceProvider {
@@ -82,18 +101,25 @@ export interface Package {
   description: string;
   price: number;
   currency: string;
-  services: PackageService[];
-  eventType: string;
-  capacity: {
-    min: number;
-    max: number;
-  };
-  thumbnailImage?: string;
-  features?: string[];
-  images?: string[]; // Add this property
+  images: string[];
+  features: string[];
+  crowdSizeMin: number;
+  crowdSizeMax: number;
+  eventTypes: string[];
+  status: string;
   provider_id?: string;
-  bookings?: number;
-  status?: string;
+  providerInfo?: {
+    id: string;
+    name: string;
+    businessName?: string;
+    profileImage?: string | null;
+    serviceType?: string;
+  };
+  serviceType?: string;
+  // New fields for combined packages
+  combined?: boolean;
+  packages?: Package[];
+  serviceTypes?: string[];
 }
 
 // Event types and categories
@@ -148,22 +174,21 @@ export interface ServiceType {
 
 // Filter Types
 export interface EventFilter {
-  eventType?: string;
   services: string[];
-  date?: Date;
+  eventType?: string;
+  budgetRange?: {
+    min: number;
+    max: number;
+  };
+  crowdRange?: {
+    min: number;
+    max: number;
+  };
   location?: string;
-  budgetRange: {
-    min: number;
-    max: number;
-  };
-  crowdRange: {
-    min: number;
-    max: number;
-  };
-  packageFilter: "package" | "non-package" | null;
+  packageFilter?: string | null;
+  packageDisplayMode?: 'individual' | 'grouped';
   hotelType?: string;
 }
-
 // Booking Types
 export interface Booking {
   id: string;
@@ -220,4 +245,31 @@ export interface PublicEvent {
   };
   eventDate: string;
   createdAt: string;
+}
+// Add these interfaces to your existing types/index.ts file
+
+export interface PromotionResponse {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  bannerImage?: string;
+  status: string;
+  publishedDate: string;
+  validUntil?: string;
+  promoCode?: string;
+  terms?: string[];
+}
+
+export interface PublicEventResponse {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  bannerImage?: string;
+  status: string;
+  publishedDate: string;
+  location?: string;
+  eventDate?: string;
+  eventType?: string; // For categorization
 }

@@ -4,11 +4,10 @@ from app.db.mongodb import get_database
 from datetime import datetime
 from bson.objectid import ObjectId
 from typing import List, Optional
-from app.api.deps import get_current_admin_user
+from app.api.deps import get_current_admin_user, get_current_user  # Add get_current_user import
 import cloudinary
 import cloudinary.uploader
 from app.core.config import settings
-
 router = APIRouter()
 
 # Configure Cloudinary
@@ -241,3 +240,43 @@ async def publish_promotion(
     del updated_promotion["_id"]
     
     return updated_promotion
+
+
+@router.get("/promotions/active", response_model=List[dict])
+async def get_active_promotions(
+    type: Optional[str] = None,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Get all active promotions and public events for regular users"""
+    db = await get_database()
+    
+    # Build query to find active promotions
+    query = {"status": "active"}
+    
+    # Filter by type if provided
+    if type:
+        query["type"] = type
+    
+    cursor = db.promotions.find(query)
+    promotions = await cursor.to_list(length=100)
+    
+    # Convert ObjectIds to strings and standardize field names
+    for promo in promotions:
+        promo["id"] = str(promo["_id"])
+        del promo["_id"]
+        
+        # Handle the image field name inconsistency
+        if "banner_image" in promo and not "bannerImage" in promo:
+            promo["bannerImage"] = promo["banner_image"]
+        
+        # Other field name standardizations if needed
+        if "valid_until" in promo and not "validUntil" in promo:
+            promo["validUntil"] = promo["valid_until"]
+        
+        if "promo_code" in promo and not "promoCode" in promo:
+            promo["promoCode"] = promo["promo_code"]
+        
+        if "event_date" in promo and not "eventDate" in promo:
+            promo["eventDate"] = promo["event_date"]
+    
+    return promotions;

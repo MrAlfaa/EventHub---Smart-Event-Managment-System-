@@ -179,13 +179,13 @@ const adminService = {
   },
 
   // Approve a service provider
-  approveServiceProvider: async (id: string): Promise<void> => {
+  approveServiceProvider: async (id: string): Promise<{message: string, email_sent: boolean}> => {
     const response = await adminApi.post(`/admin/service-providers/${id}/approve`);
     return response.data;
   },
 
   // Reject a service provider
-  rejectServiceProvider: async (id: string, reason: string): Promise<void> => {
+  rejectServiceProvider: async (id: string, reason: string): Promise<{message: string, email_sent: boolean}> => {
     const response = await adminApi.post(`/admin/service-providers/${id}/reject`, {
       reason
     });

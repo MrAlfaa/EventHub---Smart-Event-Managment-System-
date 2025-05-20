@@ -227,7 +227,7 @@ const ServiceProviderApproval: React.FC = () => {
   // Handle approve provider
   const handleApprove = async (provider: ServiceProvider) => {
     try {
-      await adminService.approveServiceProvider(provider.id);
+      const response = await adminService.approveServiceProvider(provider.id);
       
       // Update local state
       const updatedProviders = serviceProviders.map(p => 
@@ -238,7 +238,13 @@ const ServiceProviderApproval: React.FC = () => {
       applyFilters(updatedProviders, searchTerm, filterStatus, filterServiceType, sortField, sortDirection);
       
       setShowDetailsDialog(false);
-      toast.success(`${provider.businessName} has been approved`);
+      
+      // Show toast with email status
+      if (response.email_sent) {
+        toast.success(`${provider.businessName} has been approved and an email notification has been sent.`);
+      } else {
+        toast.success(`${provider.businessName} has been approved but the email notification could not be sent.`);
+      }
     } catch (error) {
       console.error("Error approving provider:", error);
       toast.error("Failed to approve provider");
@@ -256,7 +262,7 @@ const ServiceProviderApproval: React.FC = () => {
     if (!selectedProvider || !rejectionReason) return;
     
     try {
-      await adminService.rejectServiceProvider(selectedProvider.id, rejectionReason);
+      const response = await adminService.rejectServiceProvider(selectedProvider.id, rejectionReason);
       
       // Update local state
       const updatedProviders = serviceProviders.map(p => 
@@ -268,7 +274,13 @@ const ServiceProviderApproval: React.FC = () => {
       
       setShowRejectDialog(false);
       setRejectionReason("");
-      toast.success(`${selectedProvider.businessName} has been rejected`);
+      
+      // Show toast with email status
+      if (response.email_sent) {
+        toast.success(`${selectedProvider.businessName} has been rejected and an email notification has been sent.`);
+      } else {
+        toast.success(`${selectedProvider.businessName} has been rejected but the email notification could not be sent.`);
+      }
     } catch (error) {
       console.error("Error rejecting provider:", error);
       toast.error("Failed to reject provider");

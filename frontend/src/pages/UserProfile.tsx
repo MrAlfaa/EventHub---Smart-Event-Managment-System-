@@ -252,7 +252,7 @@ const UserProfile = () => {
           </TabsContent>
           
           <TabsContent value="reviews">
-            <ReviewsTab reviews={mockReviews} />
+            <ReviewsTab />
           </TabsContent>
 
           <TabsContent value="notifications">
