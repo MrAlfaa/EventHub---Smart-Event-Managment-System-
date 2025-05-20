@@ -16,6 +16,7 @@ import {
   AlertCircle,
   PackageOpen,
   Star,
+  Clock,
   FileText,
   X
 } from "lucide-react";
@@ -304,6 +305,8 @@ const ProviderNotifications = () => {
         return <PackageOpen className="h-4 w-4" />;
       case 'review':
         return <Star className="h-4 w-4" />;
+      case 'event_reminder':
+        return <Clock className="h-4 w-4" />;
       case 'system':
         return <FileText className="h-4 w-4" />;
       default:
@@ -319,6 +322,7 @@ const ProviderNotifications = () => {
       case "alert": return "bg-red-50 border-red-200";
       case "package": return "bg-purple-50 border-purple-200";
       case "review": return "bg-yellow-50 border-yellow-200";
+      case "event_reminder": return "bg-indigo-50 border-indigo-200";
       case "system": return "bg-gray-50 border-gray-200";
       default: return "bg-gray-50 border-gray-200";
     }
@@ -339,6 +343,7 @@ const ProviderNotifications = () => {
             type === 'alert' ? 'bg-red-100 text-red-600' :
             type === 'package' ? 'bg-purple-100 text-purple-600' :
             type === 'review' ? 'bg-yellow-100 text-yellow-600' :
+            type === 'event_reminder' ? 'bg-indigo-100 text-indigo-600' :
             'bg-gray-100 text-gray-600'
           }`}>
             {getNotificationIcon(type)}
@@ -366,6 +371,14 @@ const ProviderNotifications = () => {
             <div className="flex gap-2 mt-4">
               <Button variant="default">View Booking</Button>
               <Button variant="outline">Message Customer</Button>
+            </div>
+          )}
+          
+          {/* Special actions for event reminders */}
+          {type === 'event_reminder' && (
+            <div className="flex gap-2 mt-4">
+              <Button variant="default">View Event Details</Button>
+              <Button variant="outline">Add to Calendar</Button>
             </div>
           )}
         </div>
@@ -608,6 +621,7 @@ const ProviderNotifications = () => {
                       notif.type === 'alert' ? 'bg-red-100 text-red-600' :
                       notif.type === 'package' ? 'bg-purple-100 text-purple-600' :
                       notif.type === 'review' ? 'bg-yellow-100 text-yellow-600' :
+                      notif.type === 'event_reminder' ? 'bg-indigo-100 text-indigo-600' :
                       'bg-gray-100 text-gray-600'
                     }`}>
                       {getNotificationIcon(notif.type)}
