@@ -13,3 +13,18 @@ export function formatCurrency(amount: number, currency: string = 'LKR'): string
     maximumFractionDigits: 0,
   }).format(amount)
 }
+
+export function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date'
+  }
+  
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}

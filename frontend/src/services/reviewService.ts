@@ -1,8 +1,21 @@
 import axios from 'axios';
-import { Review } from '@/types';
 
 // Define the API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Define Review interface to match the backend
+export interface Review {
+  id: string;
+  userId: string;
+  userName: string;
+  userImage?: string;
+  serviceProviderId: string;
+  providerName: string;
+  rating: number;
+  comment: string;
+  date: string;
+  response?: string | null;
+}
 
 // Create an axios instance
 const reviewApi = axios.create({
@@ -73,6 +86,21 @@ const reviewService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching user reviews:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing review
+  updateReview: async (reviewId: string, updateData: {
+    rating: number,
+    comment: string,
+    serviceProviderId: string
+  }): Promise<Review> => {
+    try {
+      const response = await reviewApi.put(`/reviews/${reviewId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating review:', error);
       throw error;
     }
   }
