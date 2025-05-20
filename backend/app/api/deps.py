@@ -7,6 +7,7 @@ from app.db.mongodb import get_database
 from app.core.config import settings
 from app.models.user import UserInDB
 from bson.objectid import ObjectId
+from bson.errors import InvalidId
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -24,7 +25,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         )
     
     db = await get_database()
-    user = await db.users.find_one({"_id": ObjectId(token_data.sub)})
+    
+    # Handle the user_id properly, whether it's a valid ObjectId or not
+    user_id = token_data.sub
+    
+    # Check if user_id starts with 'manual_', and if so, remove the prefix
+    if isinstance(user_id, str) and user_id.startswith('manual_'):
+        # For manual IDs, remove the prefix and try to get a valid ObjectId
+        clean_id = user_id.replace('manual_', '')
+        try:
+            object_id = ObjectId(clean_id)
+            user = await db.users.find_one({"_id": object_id})
+        except InvalidId:
+            # If still invalid after cleanup, try finding by string ID
+            user = await db.users.find_one({"id": user_id})  # Some systems might store string IDs
+    else:
+        # For regular IDs, try direct ObjectId conversion
+        try:
+            object_id = ObjectId(user_id)
+            user = await db.users.find_one({"_id": object_id})
+        except InvalidId:
+            # If invalid, try finding by string ID
+            user = await db.users.find_one({"id": user_id})
     
     if not user:
         raise HTTPException(
