@@ -1,7 +1,8 @@
 
 import React, { ReactNode, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore'; // Adjusted path
-import { useCartStore } from '@/store/useCartStore'; // Corrected path
+import useCartStore from '@/store/useCartStore'; // Corrected path
+
 import { toast } from 'sonner';
 
 interface ZustandProviderProps {
@@ -22,7 +23,8 @@ export const ZustandProvider = ({ children }: ZustandProviderProps) => {
       const savedCart = localStorage.getItem('eventHub_cart');
       if (savedCart) {
         JSON.parse(savedCart).forEach((item: any) => {
-          useCartStore.getState().addItem(item);
+         useCartStore.getState().addToCart(item);
+
         });
       }
     } catch (error) {

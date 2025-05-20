@@ -54,6 +54,7 @@ const AdminDashboard = () => {
         <Route path="/service-types" element={<ServiceTypesManager />} />
         <Route path="/notifications" element={<AdminNotifications />} />
         <Route path="/settings" element={<AdminSettings />} />
+        <Route path="/service-providers/approval" element={<ServiceProviderApproval />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

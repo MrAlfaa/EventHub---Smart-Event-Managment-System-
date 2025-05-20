@@ -1,232 +1,173 @@
-import { Button } from "@/components/ui/button";
-import { Review, ServiceProvider } from "@/types";
-import { Star, PenLine, X } from "lucide-react";
 import { useState } from "react";
-import { useAuthStore } from "@/store/useAuthStore";
-import { toast } from "sonner";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { ServiceProvider, Review } from "@/types";
+import { Star, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner"; // Use sonner if it's the toast library in the project
+import { useAuthStore } from "@/store/useAuthStore";
+import reviewService from "@/services/reviewService";
+import { Label } from "@/components/ui/label";
 
 interface ReviewsTabProps {
   provider: ServiceProvider;
   reviews: Review[];
+  onReviewAdded?: (newReview: Review) => void;
 }
 
-const ReviewForm = ({ onClose, providerId }: { onClose: () => void, providerId: string }) => {
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
+export const ReviewsTab = ({ provider, reviews, onReviewAdded }: ReviewsTabProps) => {
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, isAuthenticated } = useAuthStore();
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (rating === 0) {
-      toast.error("Please select a rating");
-      return;
-    }
-    
-    if (comment.trim().length < 10) {
-      toast.error("Please enter a comment with at least 10 characters");
+
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated || !user) {
+      toast.error("Please login to submit a review");
       return;
     }
 
-    // For anonymous users, validate name
-    if (!isAuthenticated && name.trim().length < 2) {
-      toast.error("Please enter your name");
+    if (rating < 1 || comment.trim() === "") {
+      toast.error("Please provide a rating and comment");
       return;
     }
-    
-    // Create review object
-    const newReview: Partial<Review> = {
-      userId: user?.id || "anonymous",
-      serviceProviderId: providerId,
-      userName: isAuthenticated ? user?.name || "" : name,
-      userImage: user?.profileImage,
-      rating,
-      comment,
-      date: new Date().toISOString(),
-    };
-    
-    // In a real app, you would send this to your API
-    console.log("Submitting review:", newReview);
-    
-    toast.success("Review submitted successfully!");
-    onClose();
+
+    setIsSubmitting(true);
+    try {
+      console.log("Submitting review for provider:", provider.id);
+      const newReview = await reviewService.createReview(
+        provider.id, 
+        rating, 
+        comment
+      );
+      
+      toast.success("Thank you for your feedback!");
+      
+      setOpen(false);
+      setRating(5);
+      setComment("");
+      
+      if (onReviewAdded) {
+        onReviewAdded(newReview);
+      }
+    } catch (error: any) {
+      console.error("Error submitting review:", error);
+      
+      // More detailed error message
+      const errorMessage = error.response?.data?.detail || "Failed to submit review. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  
+
+  const userHasReviewed = reviews.some(review => 
+    user && review.userId === user.id
+  );
+
   return (
-    <Card className="mb-6">
-      <CardContent className="p-6">
+    <Card>
+      <CardContent className="p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-medium text-lg">Write a Review</h3>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onClose}
-            className="h-8 w-8 rounded-full"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <h3 className="text-lg font-semibold">Reviews</h3>
+          {isAuthenticated && !userHasReviewed && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setOpen(true)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Write a Review
+            </Button>
+          )}
         </div>
         
-        <form onSubmit={handleSubmit}>
-          {/* Show name and email fields for anonymous users */}
-          {!isAuthenticated && (
-            <div className="mb-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
-              <div>
-                <label htmlFor="reviewer-name" className="mb-2 block font-medium">
-                  Your Name <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  id="reviewer-name"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+        {reviews.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No reviews yet</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reviews.map((review) => (
+              <div key={review.id} className="border-b pb-4 last:border-b-0 last:pb-0">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium">{review.userName}</p>
+                    <div className="flex items-center mt-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star 
+                          key={i} 
+                          className={`h-4 w-4 ${i < review.rating ? 'text-yellow-500 fill-current' : 'text-gray-300'}`} 
+                        />
+                      ))}
+                      <span className="ml-2 text-sm text-gray-600">
+                        {new Date(review.date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-gray-700">{review.comment}</p>
+                {review.response && (
+                  <div className="mt-3 pl-4 border-l-2 border-gray-200">
+                    <p className="text-sm font-medium">Response from {provider.name}</p>
+                    <p className="mt-1 text-sm text-gray-700">{review.response}</p>
+                  </div>
+                )}
               </div>
-              <div>
-                <label htmlFor="reviewer-email" className="mb-2 block font-medium">
-                  Email (optional)
-                </label>
-                <Input
-                  id="reviewer-email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
+      </CardContent>
 
-          <div className="mb-4">
-            <p className="mb-2 font-medium">Your Rating <span className="text-red-500">*</span></p>
-            <div className="flex items-center">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`h-8 w-8 cursor-pointer ${
-                    (hoverRating || rating) >= star 
-                      ? "text-yellow-500" 
-                      : "text-gray-300"
-                  }`}
-                  fill={(hoverRating || rating) >= star ? "currentColor" : "none"}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                />
-              ))}
-              <span className="ml-2 text-sm text-gray-500">
-                {rating > 0 ? `You selected ${rating} ${rating === 1 ? 'star' : 'stars'}` : 'Select your rating'}
-              </span>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Write a Review</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rating">Rating</Label>
+              <div className="flex items-center">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setRating(i + 1)}
+                    className="focus:outline-none"
+                    aria-label={`Rate ${i + 1} star${i !== 0 ? 's' : ''}`}
+                    title={`Rate ${i + 1} star${i !== 0 ? 's' : ''}`}
+                  >
+                    <Star
+                      className={`h-6 w-6 ${
+                        i < rating ? 'text-yellow-500 fill-current' : 'text-gray-300'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="comment">Review</Label>
+              <Textarea
+                id="comment"
+                placeholder="Share your experience with this service provider..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={5}
+              />
             </div>
           </div>
-          
-          <div className="mb-4">
-            <label htmlFor="review-comment" className="mb-2 block font-medium">
-              Your Review <span className="text-red-500">*</span>
-            </label>
-            <Textarea
-              id="review-comment"
-              placeholder="Write your honest review here..."
-              className="min-h-[100px]"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              Submit Review
+            <Button onClick={handleSubmitReview} disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit Review'}
             </Button>
-          </div>
-        </form>
-      </CardContent>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
-  );
-};
-
-export const ReviewsTab = ({ provider, reviews }: ReviewsTabProps) => {
-  const [showReviewForm, setShowReviewForm] = useState(false);
-
-  const handleAddReview = () => {
-    // Removed authentication check to allow anyone to write a review
-    setShowReviewForm(true);
-  };
-
-  return (
-    <div className="rounded-lg border bg-white p-6 shadow-sm">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-semibold">Customer Reviews</h2>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center">
-            <Star className="mr-1 h-5 w-5 text-yellow-500" fill="currentColor" />
-            <span className="font-medium">{provider.rating}</span>
-            <span className="mx-2 text-gray-400">•</span>
-            <span className="text-gray-600">{provider.reviewCount} reviews</span>
-          </div>
-          <Button 
-            onClick={handleAddReview}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            size="sm"
-          >
-            <PenLine className="mr-2 h-4 w-4" />
-            Write a Review
-          </Button>
-        </div>
-      </div>
-      
-      {showReviewForm && (
-        <ReviewForm 
-          onClose={() => setShowReviewForm(false)} 
-          providerId={provider.id}
-        />
-      )}
-      
-      <div className="space-y-6">
-        {reviews.map((review) => (
-          <div key={review.id} className="border-b pb-6 last:border-0">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  {review.userName.charAt(0)}
-                </div>
-                <div className="ml-3">
-                  <p className="font-medium">{review.userName}</p>
-                  <p className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center">
-                {Array(5)
-                  .fill(0)
-                  .map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${
-                        i < review.rating ? "text-yellow-500" : "text-gray-300"
-                      }`}
-                      fill={i < review.rating ? "currentColor" : "none"}
-                    />
-                  ))}
-              </div>
-            </div>
-            <p className="text-gray-700">{review.comment}</p>
-          </div>
-        ))}
-      </div>
-      
-      <Button variant="outline" className="mt-4 w-full">
-        Load More Reviews
-      </Button>
-    </div>
-  );
-};
+  );};

@@ -1,5 +1,5 @@
   import { create } from 'zustand';
-  import { User } from '@/types';
+  import { User } from '@/types/index';
   import userService from '../services/userService';
   import authService, { LoginCredentials, RegisterUserData, RegisterServiceProviderData } from '@/services/authService';
 
@@ -15,6 +15,7 @@
     logout: () => void;
     setUser: (user: User | null) => void;
     registerServiceProvider: (providerData: RegisterServiceProviderData) => Promise<void>;
+    registerServiceProviderProfile: (profileData: any) => Promise<void>;
   }
 
   // Add this interface for login response
@@ -140,6 +141,19 @@
         localStorage.removeItem('eventHub_user');
         set({ user: null, isAuthenticated: false, isAdmin: false });
         return false;
+      }
+    },
+    registerServiceProviderProfile: async (profileData: any) => {
+      set({ isLoading: true, error: null });
+      try {
+        await authService.registerServiceProviderProfile(profileData);
+        set({ isLoading: false });
+      } catch (error) {
+        set({ 
+          isLoading: false, 
+          error: error instanceof Error ? error.message : 'Profile submission failed' 
+        });
+        throw error;
       }
     }
   }));

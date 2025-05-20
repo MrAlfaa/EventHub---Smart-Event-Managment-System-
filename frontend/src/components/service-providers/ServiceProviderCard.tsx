@@ -3,13 +3,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ServiceProvider } from "@/types";
 import { MapPin, Star, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface ServiceProviderCardProps {
   provider: ServiceProvider;
 }
 
 export function ServiceProviderCard({ provider }: ServiceProviderCardProps) {
+  const navigate = useNavigate();
+  
+  const handleViewProvider = () => {
+    navigate(`/service-providers/${provider.id}`);
+  };
+  
   return (
     <Card className="group overflow-hidden transition-all duration-300 hover:shadow-lg">
       {/* Cover and Profile Image Section */}
@@ -17,7 +23,7 @@ export function ServiceProviderCard({ provider }: ServiceProviderCardProps) {
         {/* Cover Image */}
         <div className="absolute inset-0">
           <img
-            src={provider.coverImage || provider.profileImage}
+            src={provider.profileImage || "/placeholder-cover.jpg"}
             alt={`${provider.name} cover`}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
@@ -28,7 +34,7 @@ export function ServiceProviderCard({ provider }: ServiceProviderCardProps) {
         <div className="absolute -bottom-6 left-4">
           <div className="h-16 w-16 rounded-full ring-4 ring-white overflow-hidden">
             <img
-              src={provider.profileImage}
+              src={provider.profileImage || "/placeholder-profile.jpg"}
               alt={provider.name}
               className="h-full w-full object-cover"
             />
@@ -48,40 +54,49 @@ export function ServiceProviderCard({ provider }: ServiceProviderCardProps) {
           <div className="flex items-center gap-2">
             <div className="flex items-center text-yellow-500">
               <Star className="h-4 w-4 fill-current" />
-              <span className="ml-1 text-sm font-medium">{provider.rating}</span>
+              <span className="ml-1 text-sm font-medium">{provider.rating || "New"}</span>
             </div>
-            <span className="text-sm text-gray-500">({provider.reviewCount} reviews)</span>
+            <span className="text-sm text-gray-500">({provider.reviewCount || 0} reviews)</span>
           </div>
         </div>
 
         {/* Location */}
         <div className="flex items-center text-gray-600 text-sm mb-3">
           <MapPin className="h-4 w-4 text-gray-400 mr-1" />
-          <span className="truncate">{provider.location.city}</span>
+          <span className="truncate">{provider.location || "Location not specified"}</span>
         </div>
 
         {/* Event Types */}
         <div className="mb-4 flex flex-wrap gap-1.5">
-          {provider.eventTypes.slice(0, 3).map((type, index) => (
-            <Badge key={index} variant="outline" className="bg-blue-50/50 text-xs">
-              {type}
-            </Badge>
-          ))}
-          {provider.eventTypes.length > 3 && (
+          {provider.eventTypes && provider.eventTypes.length > 0 ? (
+            <>
+              {provider.eventTypes.slice(0, 3).map((type, index) => (
+                <Badge key={index} variant="outline" className="bg-blue-50/50 text-xs">
+                  {type}
+                </Badge>
+              ))}
+              {provider.eventTypes.length > 3 && (
+                <Badge variant="outline" className="bg-gray-50 text-xs">
+                  +{provider.eventTypes.length - 3}
+                </Badge>
+              )}
+            </>
+          ) : (
             <Badge variant="outline" className="bg-gray-50 text-xs">
-              +{provider.eventTypes.length - 3}
+              All Events
             </Badge>
           )}
         </div>
 
         {/* View More Button */}
-        <Link to={`/service-providers/${provider.id}`} className="w-full">
-          <Button className="w-full" variant="outline">
-            View More
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </Link>
+        <Button 
+          className="w-full" 
+          variant="outline" 
+          onClick={handleViewProvider}
+        >
+          View More
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
       </CardContent>
     </Card>
-  );
-}
+  );}

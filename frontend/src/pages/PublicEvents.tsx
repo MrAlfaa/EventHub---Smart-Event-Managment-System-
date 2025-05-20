@@ -1,8 +1,7 @@
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
-import { PublicEvent } from "@/types";
+import { PublicEventResponse } from "@/types/promotion";
 import { useState, useEffect } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar as CalendarIcon, MapPin, Calendar, X } from "lucide-react";
@@ -12,15 +11,12 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-
-// Extend PublicEvent type to include eventType
-interface ExtendedPublicEvent extends PublicEvent {
-  eventType: string;
-}
+import promotionService from "@/services/promotionService";
+import { toast } from "sonner";
 
 export default function PublicEvents() {
-  const [events, setEvents] = useState<ExtendedPublicEvent[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<ExtendedPublicEvent[]>([]);
+  const [events, setEvents] = useState<PublicEventResponse[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<PublicEventResponse[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filter states
@@ -32,77 +28,42 @@ export default function PublicEvents() {
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
 
-  // In a real application, you would fetch this data from your backend
   useEffect(() => {
-    // Simulating API call with mock data (extended with eventType)
-    const mockEvents: ExtendedPublicEvent[] = [
-      {
-        id: "1",
-        title: "Summer Music Festival 2025",
-        description: "A day filled with live music performances, food stalls, and entertainment.",
-        bannerImage: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3",
-        location: {
-          address: "Viharamahadevi Park, Colombo",
-          googleMapLink: "https://maps.google.com/?q=Viharamahadevi+Park"
-        },
-        eventDate: "2025-06-15",
-        createdAt: new Date().toISOString(),
-        eventType: "Music"
-      },
-      {
-        id: "2",
-        title: "Food & Culture Festival",
-        description: "Explore Sri Lankan cuisine and cultural performances.",
-        bannerImage: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1",
-        location: {
-          address: "BMICH, Colombo",
-          googleMapLink: "https://maps.google.com/?q=BMICH"
-        },
-        eventDate: "2025-07-01",
-        createdAt: new Date().toISOString(),
-        eventType: "Food"
-      },
-      {
-        id: "3",
-        title: "Tech Conference 2025",
-        description: "Join industry leaders to discuss the latest technology trends and innovations.",
-        bannerImage: "https://images.unsplash.com/photo-1540575467063-178a50c2df87",
-        location: {
-          address: "Cinnamon Grand, Colombo",
-          googleMapLink: "https://maps.google.com/?q=Cinnamon+Grand+Colombo"
-        },
-        eventDate: "2025-05-20",
-        createdAt: new Date().toISOString(),
-        eventType: "Technology"
-      },
-      {
-        id: "4",
-        title: "Kandy Perahera Festival",
-        description: "Experience the traditional procession with elephants, dancers, and musicians.",
-        bannerImage: "https://images.unsplash.com/photo-1534335675817-11b9c8a47fab",
-        location: {
-          address: "Temple of the Tooth, Kandy",
-          googleMapLink: "https://maps.google.com/?q=Temple+of+the+Tooth+Kandy"
-        },
-        eventDate: "2025-08-10",
-        createdAt: new Date().toISOString(),
-        eventType: "Cultural"
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const data = await promotionService.getActivePublicEvents();
+        
+        // Add eventType to events if not present
+        const processedEvents = data.map(event => ({
+          ...event,
+          eventType: event.eventType || "General"
+        }));
+        
+        setEvents(processedEvents);
+        setFilteredEvents(processedEvents);
+        
+        // Extract unique event types and locations for filter options
+        const types = Array.from(new Set(processedEvents.map(event => event.eventType || "General")));
+        
+        // Extract city from location (assuming format is "Venue, City")
+        const locs = Array.from(new Set(processedEvents.map(event => {
+          if (!event.location) return "Unknown";
+          const parts = event.location.split(', ');
+          return parts.length > 1 ? parts[parts.length - 1] : event.location;
+        })));
+        
+        setEventTypes(types);
+        setLocations(locs);
+      } catch (error) {
+        console.error("Failed to fetch public events:", error);
+        toast.error("Failed to load events. Please try again later.");
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    setEvents(mockEvents);
-    setFilteredEvents(mockEvents);
-    
-    // Extract unique event types and locations for filter options
-    const types = Array.from(new Set(mockEvents.map(event => event.eventType)));
-    const locs = Array.from(new Set(mockEvents.map(event => {
-      const parts = event.location.address.split(', ');
-      return parts[parts.length - 1]; // Get the city name
-    })));
-    
-    setEventTypes(types);
-    setLocations(locs);
-    setLoading(false);
+    fetchEvents();
   }, []);
 
   // Apply filters whenever filter values change
@@ -116,16 +77,20 @@ export default function PublicEvents() {
     
     // Apply location filter
     if (locationFilter !== "all") {
-      result = result.filter(event => event.location.address.includes(locationFilter));
+      result = result.filter(event => {
+        if (!event.location) return false;
+        return event.location.includes(locationFilter);
+      });
     }
     
     // Apply date filter
-    if (dateFilter) {
+    if (dateFilter && dateFilter instanceof Date) {
       const selectedDate = new Date(dateFilter);
       // Set time to midnight for date comparison
       selectedDate.setHours(0, 0, 0, 0);
       
       result = result.filter(event => {
+        if (!event.eventDate) return false;
         const eventDate = new Date(event.eventDate);
         eventDate.setHours(0, 0, 0, 0);
         return eventDate.getTime() === selectedDate.getTime();
@@ -144,6 +109,15 @@ export default function PublicEvents() {
 
   // Check if any filters are active
   const hasActiveFilters = eventTypeFilter !== "all" || locationFilter !== "all" || dateFilter !== undefined;
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "TBD";
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   return (
     <Layout>
@@ -273,7 +247,9 @@ export default function PublicEvents() {
         </div>
         
         {loading ? (
-          <div className="text-center py-12">Loading events...</div>
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+          </div>
         ) : filteredEvents.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500">No events match your current filters.</p>
@@ -293,12 +269,12 @@ export default function PublicEvents() {
               <Card key={event.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video relative overflow-hidden">
                   <img
-                    src={event.bannerImage}
+                    src={event.bannerImage || "https://placehold.co/600x400?text=Event"}
                     alt={event.title}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute top-2 right-2">
-                    <Badge>{event.eventType}</Badge>
+                    <Badge>{event.eventType || "General"}</Badge>
                   </div>
                 </div>
                 <CardContent className="p-4">
@@ -307,20 +283,15 @@ export default function PublicEvents() {
                   <div className="space-y-2 text-sm text-gray-500">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-                      <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+                      <span>{formatDate(event.eventDate)}</span>
                     </div>
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-                      <span>{event.location.address}</span>
-                    </div>
-                    <a
-                      href={event.location.googleMapLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline flex items-center"
-                    >
-                      View on Google Maps
-                    </a>
+                    {event.location && (
+                      <div className="flex items-center">
+                        <MapPin className="w-4 h-4 mr-2 text-blue-500" />
+                        <span>{event.location}</span>
+                      </div>
+                    )}
+                    {/* Add Google Maps link if needed - would require coordinates in backend */}
                   </div>
                 </CardContent>
               </Card>

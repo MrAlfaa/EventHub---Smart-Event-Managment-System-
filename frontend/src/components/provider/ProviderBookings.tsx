@@ -1,8 +1,7 @@
-import React, { useState, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/providers/AppProvider";
-import { CalendarIcon, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { BookingDetailsView } from "@/components/service-provider/BookingDetailsView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +23,11 @@ const ProviderBookings = () => {
   const bookingsTabRef = useRef<{ handleBookingAdded: (booking: BookingData) => void }>({
     handleBookingAdded: () => {} // Default no-op function
   });
+  
+  // Create a ref for the ManageAvailabilityTab to refresh calendar when needed
+  const availabilityTabRef = useRef<{ refreshCalendar: () => void }>({
+    refreshCalendar: () => {} // Default no-op function
+  });
 
   const viewBookingDetails = (bookingId: number) => {
     setCurrentBookingId(bookingId);
@@ -36,6 +40,13 @@ const ProviderBookings = () => {
     bookingsTabRef.current.handleBookingAdded(newBooking);
     // Close the add booking dialog
     setShowAddBookingDialog(false);
+    
+    // If the availability tab is initialized, refresh it to show the new booking
+    if (availabilityTabRef.current.refreshCalendar) {
+      availabilityTabRef.current.refreshCalendar();
+    }
+    
+    toast.success("New booking added successfully");
   };
 
   return (
@@ -43,7 +54,14 @@ const ProviderBookings = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Bookings</h1>
         <div className="flex gap-2 items-center">
-          {/* Add additional header buttons here if needed in the future */}
+          <Button
+            onClick={() => setShowAddBookingDialog(true)}
+            className="flex items-center"
+            variant="default"
+          >
+            <PlusCircle className="h-4 w-4 mr-1" />
+            Add Booking
+          </Button>
         </div>
       </div>
 
@@ -58,7 +76,7 @@ const ProviderBookings = () => {
 
         {/* Booking Details Tab Content */}
         <TabsContent value="bookings" className="mt-6">
-          <div className="flex gap-2 pb-4">
+          <div className="flex gap-2 pb-4 overflow-x-auto hide-scrollbar">
             <Button 
               variant={filter === "all" ? "default" : "outline"} 
               className={filter === "all" ? "bg-blue-50" : ""}
@@ -74,8 +92,15 @@ const ProviderBookings = () => {
               Pending
             </Button>
             <Button 
+              variant={filter === "confirmed" ? "default" : "outline"}
+              className={filter === "confirmed" ? "bg-blue-50" : ""}
+              onClick={() => setFilter("confirmed")}
+            >
+              Confirmed
+            </Button>
+            <Button 
               variant={filter === "completed" ? "default" : "outline"}
-              className={filter === "completed" ? "bg-blue-50" : ""}
+              className={filter === "completed" ? "bg-green-50" : ""}
               onClick={() => setFilter("completed")}
             >
               Completed
@@ -101,21 +126,31 @@ const ProviderBookings = () => {
 
         {/* Availability Management Tab Content */}
         <TabsContent value="availability" className="mt-6">
-          <ManageAvailabilityTab />
+          <ManageAvailabilityTab 
+            ref={(ref: any) => {
+              if (ref) {
+                availabilityTabRef.current = ref;
+              }
+            }}
+          />
         </TabsContent>
       </Tabs>
       
+      {/* We'll use the details view component later when implementing the add booking functionality */}
       <BookingDetailsView 
         open={showBookingDetailsDialog} 
         onOpenChange={setShowBookingDetailsDialog} 
         bookingId={currentBookingId} 
       />
       
-      <AddBookingForm
-        open={showAddBookingDialog}
-        onOpenChange={setShowAddBookingDialog}
-        onBookingAdded={handleBookingAdded}
-      />
+      {/* This will be implemented later */}
+      {showAddBookingDialog && (
+        <AddBookingForm
+          open={showAddBookingDialog}
+          onOpenChange={setShowAddBookingDialog}
+          onBookingAdded={handleBookingAdded}
+        />
+      )}
     </div>
   );
 };

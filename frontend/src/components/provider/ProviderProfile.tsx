@@ -22,6 +22,7 @@ import {
 import CardConfirmationDialog from "./dialogs/CardConfirmationDialog";
 import ProfileUpdateConfirmationDialog from "./dialogs/ProfileUpdateConfirmationDialog";
 import { Separator } from "@/components/ui/separator";
+import providerService from "@/services/providerService";
 
 // Define service types for dropdown selection
 const SERVICE_TYPES = [
@@ -207,23 +208,92 @@ const ProviderProfile = () => {
     
     setLoading(true);
     
-    // In a real app, you would fetch provider profile data from an API
-    // For now, we'll use the user data from the context mixed with our default data
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        businessName: user.name || prev.businessName,
-        email: user.email || prev.email,
-        phone: user.phone || prev.phone,
-      }));
-    }
+    // Fetch provider profile data from API
+    const fetchProviderProfile = async () => {
+      try {
+        const profileData = await providerService.getProviderProfile();
+        
+        // Update form data with profile data
+        setFormData({
+  providerName: profileData.provider_name || "",
+  nicNumber: profileData.nic_number || "",
+  businessName: profileData.business_name || "",
+  businessRegistrationNumber: profileData.business_registration_number || "",
+  description: profileData.business_description || "",
+  slogan: profileData.slogan || "",
+  address: profileData.address || "",
+  city: profileData.city || "",
+  province: profileData.province || "",
+  username: user?.username || "",
+  email: user?.email || profileData.contact_email || "",
+  phone: user?.phone || profileData.contact_phone || "",
+  contactEmail: profileData.contact_email || "",
+  contactPhone: profileData.contact_phone || "",
+  serviceTypes: profileData.service_types || "",
+  serviceLocations: profileData.service_locations || [],
+  coveredEventTypes: profileData.covered_event_types || [],
+  password: "********", 
+});
+        
+        // Set image URLs if available
+        if (profileData.profile_picture_url) {
+          setProfileImageUrl(profileData.profile_picture_url);
+        }
+        if (profileData.cover_photo_url) {
+          setCoverPhotoUrl(profileData.cover_photo_url);
+        }
+        if (profileData.nic_front_image_url) {
+          setNicFrontImageUrl(profileData.nic_front_image_url);
+        }
+        if (profileData.nic_back_image_url) {
+          setNicBackImageUrl(profileData.nic_back_image_url);
+        }
+        
+        // Set bank account details
+        setBankAccountDetails({
+          bankName: profileData.bank_name || "Commercial Bank",
+          branch: profileData.branch_name || "Colombo Main",
+          accountNumber: profileData.account_number || "1234567890123",
+          accountOwner: profileData.account_owner_name || "John Smith"
+        });
+        
+        // Also update the temp bank details
+        setTempBankAccountDetails({
+          bankName: profileData.bank_name || "Commercial Bank",
+          branch: profileData.branch_name || "Colombo Main",
+          accountNumber: profileData.account_number || "1234567890123",
+          accountOwner: profileData.account_owner_name || "John Smith"
+        });
+        
+        // Update city availability based on province
+        if (profileData.province) {
+          setAvailableCities(SRI_LANKA_CITIES[profileData.province as keyof typeof SRI_LANKA_CITIES] || ALL_SRI_LANKA_CITIES);
+        }
+        
+        // Fetch cards
+        fetchProviderCards();
+        
+      } catch (error) {
+        console.error("Error fetching provider profile:", error);
+        toast.error("Failed to load profile data");
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // Simulate API loading time
-    setTimeout(() => {
-      setLoading(false);
-    }, 500);
-    
+    fetchProviderProfile();
   }, [user, isAuthenticated, navigate]);
+
+  // Add function to fetch provider cards
+  const fetchProviderCards = async () => {
+    try {
+      const cardsData = await providerService.getProviderCards();
+      setCards(cardsData);
+    } catch (error) {
+      console.error("Error fetching provider cards:", error);
+      toast.error("Failed to load payment cards");
+    }
+  };
 
   // Form handling functions
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -252,7 +322,7 @@ const ProviderProfile = () => {
 
   const toggleCoveredEventType = (eventType: string) => {
     setFormData(prev => {
-      const updatedEventTypes = prev.coveredEventTypes.includes(eventType)
+           const updatedEventTypes = prev.coveredEventTypes.includes(eventType)
         ? prev.coveredEventTypes.filter(type => type !== eventType)
         : [...prev.coveredEventTypes, eventType];
       return { ...prev, coveredEventTypes: updatedEventTypes };
@@ -301,30 +371,54 @@ const ProviderProfile = () => {
     setIsProfileUpdateDialogOpen(true);
   };
 
+  // Confirm profile update with API call
   const confirmProfileUpdate = () => {
     setIsProfileUpdateProcessing(true);
     
-    // In a real app, you would make an API call to update the profile here
+    // Prepare data for API
+    const updateData = {
+      provider_name: formData.providerName,
+      business_name: formData.businessName,
+      business_description: formData.description,
+      slogan: formData.slogan,
+      address: formData.address,
+      city: formData.city,
+      province: formData.province,
+      contact_email: formData.contactEmail,
+      contact_phone: formData.contactPhone,
+      service_locations: formData.serviceLocations,
+      covered_event_types: formData.coveredEventTypes,
+    };
     
-    // Handle image uploads here
-    if (profileImage) {
-      // Upload profile image to server
-      console.log("Uploading profile image...");
-      // In a real app, you would upload the file to a server and get a URL back
-    }
+    // API call to update profile
+    const updateProfile = async () => {
+      try {
+        // Handle image uploads first if needed
+        if (profileImage) {
+          // In a real implementation, we would upload the images and get URLs back
+          // For now, just log that we would upload
+          console.log("Would upload profile image:", profileImage);
+        }
+        
+        if (coverPhoto) {
+          console.log("Would upload cover photo:", coverPhoto);
+        }
+        
+        // Update profile data
+        await providerService.updateProviderProfile(updateData);
+        
+        toast.success("Profile updated successfully");
+        setIsEditing(false);
+      } catch (error) {
+        console.error("Error updating profile:", error);
+        toast.error("Failed to update profile");
+      } finally {
+        setIsProfileUpdateProcessing(false);
+        setIsProfileUpdateDialogOpen(false);
+      }
+    };
     
-    if (coverPhoto) {
-      // Upload cover photo to server
-      console.log("Uploading cover photo...");
-      // In a real app, you would upload the file to a server and get a URL back
-    }
-    
-    setTimeout(() => {
-      toast.success("Profile updated successfully");
-      setIsEditing(false);
-      setIsProfileUpdateProcessing(false);
-      setIsProfileUpdateDialogOpen(false);
-    }, 1000);
+    updateProfile();
   };
 
   // Card management functions
@@ -417,31 +511,32 @@ const ProviderProfile = () => {
     
     setIsProcessing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      if (editingCardId) {
-        // Update existing card
-        setCards(cards.map(card => 
-          card.id === editingCardId ? currentCard : card
-        ));
-        toast.success("Card updated successfully");
-      } else {
-        // Add new card
-        if (cards.length >= 3) {
-          toast.error("Maximum 3 cards allowed");
-          setIsProcessing(false);
-          setConfirmationDialogOpen(false);
-          return;
+    // API call to save card
+    const saveCard = async () => {
+      try {
+        if (editingCardId) {
+          // Update existing card
+          await providerService.updateProviderCard(editingCardId, currentCard);
+          toast.success("Card updated successfully");
+        } else {
+          // Add new card
+          await providerService.addProviderCard(currentCard);
+          toast.success("Card added successfully");
         }
         
-        setCards([...cards, currentCard]);
-        toast.success("Card added successfully");
+        // Refresh cards
+        fetchProviderCards();
+      } catch (error) {
+        console.error("Error saving card:", error);
+        toast.error("Failed to save card");
+      } finally {
+        setIsProcessing(false);
+        setConfirmationDialogOpen(false);
+        setIsCardDialogOpen(false);
       }
-      
-      setIsProcessing(false);
-      setConfirmationDialogOpen(false);
-      setIsCardDialogOpen(false);
-    }, 1000);
+    };
+    
+    saveCard();
   };
   
   // Request to delete card
@@ -463,34 +558,49 @@ const ProviderProfile = () => {
     
     setIsProcessing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      // Check if it's the default card
-      const isDefault = cards.find(card => card.id === cardToDelete)?.isDefault;
-      let updatedCards = cards.filter(card => card.id !== cardToDelete);
-      
-      // If the default card is deleted, set the first remaining card as default
-      if (isDefault && updatedCards.length > 0) {
-        updatedCards = updatedCards.map((card, index) => 
-          index === 0 ? { ...card, isDefault: true } : card
-        );
+    // API call to delete card
+    const removeCard = async () => {
+      try {
+        await providerService.deleteProviderCard(cardToDelete);
+        toast.success("Card removed successfully");
+        
+        // Refresh cards
+        fetchProviderCards();
+      } catch (error) {
+        console.error("Error deleting card:", error);
+        toast.error("Failed to delete card");
+      } finally {
+        setIsProcessing(false);
+        setConfirmationDialogOpen(false);
+        setCardToDelete(null);
       }
-      
-      setCards(updatedCards);
-      toast.success("Card removed successfully");
-      setIsProcessing(false);
-      setConfirmationDialogOpen(false);
-      setCardToDelete(null);
-    }, 1000);
+    };
+    
+    removeCard();
   };
   
   // Set a card as default
   const setDefaultCard = (cardId: string) => {
-    setCards(cards.map(card => ({
-      ...card,
-      isDefault: card.id === cardId
-    })));
-    toast.success("Default payment method updated");
+    // API call to set default card
+    const updateDefaultCard = async () => {
+      try {
+        // Find the card
+        const cardToUpdate = cards.find(card => card.id === cardId);
+        if (cardToUpdate) {
+          // Update card with isDefault: true
+          await providerService.updateProviderCard(cardId, { ...cardToUpdate, isDefault: true });
+          toast.success("Default payment method updated");
+          
+          // Refresh cards
+          fetchProviderCards();
+        }
+      } catch (error) {
+        console.error("Error setting default card:", error);
+        toast.error("Failed to update default payment method");
+      }
+    };
+    
+    updateDefaultCard();
   };
 
   // Handle confirmation dialog close
@@ -520,9 +630,26 @@ const ProviderProfile = () => {
   };
 
   const saveBankAccountDetails = () => {
-    setBankAccountDetails({...tempBankAccountDetails});
-    setIsBankAccountDialogOpen(false);
-    toast.success("Bank account details updated successfully");
+    // API call to update bank account details
+    const updateBankDetails = async () => {
+      try {
+        await providerService.updateProviderProfile({
+          bank_name: tempBankAccountDetails.bankName,
+          branch_name: tempBankAccountDetails.branch,
+          account_number: tempBankAccountDetails.accountNumber,
+          account_owner_name: tempBankAccountDetails.accountOwner
+        });
+        
+        setBankAccountDetails({...tempBankAccountDetails});
+        setIsBankAccountDialogOpen(false);
+        toast.success("Bank account details updated successfully");
+      } catch (error) {
+        console.error("Error updating bank details:", error);
+        toast.error("Failed to update bank account details");
+      }
+    };
+    
+    updateBankDetails();
   };
 
   if (loading) {
@@ -580,6 +707,7 @@ const ProviderProfile = () => {
                   </div>
                   <input 
                     type="file" 
+                    title="Upload Cover Photo"
                     id="coverPhotoUpload" 
                     className="hidden" 
                     onChange={handleCoverPhotoChange}
@@ -612,7 +740,7 @@ const ProviderProfile = () => {
                     
                     {/* Profile Image Upload Button (visible only in edit mode) */}
                     {isEditing && (
-                      <div className="absolute bottom-0 right-0 left-0 bg-black bg-opacity-50 text-white text-xs py-1 text-center cursor-pointer">
+                                            <div className="absolute bottom-0 right-0 left-0 bg-black bg-opacity-50 text-white text-xs py-1 text-center cursor-pointer">
                         <label htmlFor="profileImageUpload" className="cursor-pointer block w-full">
                           Update
                           <input 
@@ -967,7 +1095,7 @@ const ProviderProfile = () => {
                                     >
                                       <span className="text-sm">{city}</span>
                                       {formData.serviceLocations.includes(city) && (
-                                        <Check className="h-4 w-4 text-green-600" />
+                                                                               <Check className="h-4 w-4 text-green-600" />
                                       )}
                                     </div>
                                   ))
@@ -1201,13 +1329,13 @@ const ProviderProfile = () => {
                       </Label>
                       {isEditing ? (
                         <Input 
-                          id="phone"
-                          value={formData.phone}
+                          id="contactPhone"
+                          value={formData.contactPhone}
                           onChange={handleInputChange}
                         />
                       ) : (
                         <div className="p-2 border rounded-md bg-gray-50">
-                          {formData.phone}
+                          {formData.contactPhone}
                         </div>
                       )}
                       <p className="text-xs text-muted-foreground">This phone number will be visible to customers</p>
@@ -1303,7 +1431,7 @@ const ProviderProfile = () => {
                             <span className="sr-only">Edit</span>
                           </Button>
                           <Button 
-                            variant="ghost" 
+                                                        variant="ghost" 
                             size="sm"
                             className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                             onClick={() => requestDeleteCard(card.id)}
@@ -1498,6 +1626,7 @@ const ProviderProfile = () => {
               <div className="flex items-center space-x-2 pt-2">
                 <input
                   type="checkbox"
+                  title="Set as default payment method"
                   id="isDefault"
                   checked={currentCard?.isDefault || false}
                   onChange={(e) => {
@@ -1615,3 +1744,7 @@ const ProviderProfile = () => {
 };
 
 export default ProviderProfile;
+
+
+
+

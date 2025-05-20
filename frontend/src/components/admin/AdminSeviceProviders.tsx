@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +8,15 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { ServiceProvider } from "./ServiceProviderDetailsDialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import AdminServiceProviderView from "./AdminServiceProviderView";
+import adminService from "@/services/adminService";
+import { toast } from "sonner";
+import { ServiceProvider } from "@/types";
 
 // Define type for selected image
 interface SelectedImage {
@@ -21,160 +24,79 @@ interface SelectedImage {
   title: string;
 }
 
-// Mock service provider data (filtered to only show active/approved providers)
-const mockServiceProviders: ServiceProvider[] = [
-  {
-    id: "2001",
-    businessName: "Elegant Events",
-    ownerName: "Priya Sharma",
-    email: "priya@elegantevents.com",
-    username: "priyasharma",
-    contactNumber: "+94 71 234 5678",
-    nicNumber: "912345678V",
-    businessRegNumber: "REG78901234",
-    location: "Colombo",
-    serviceType: ["Hotel", "Catering"],
-    status: "Active",
-    profileImage: "https://i.pravatar.cc/300?img=28",
-    coverPhoto: "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1200",
-    nicFrontImage: "https://images.unsplash.com/photo-1599022160646-a0a8c4407277?q=80&w=400&auto=format",
-    nicBackImage: "https://images.unsplash.com/photo-1599022160619-9d26661c68ef?q=80&w=400&auto=format",
-    eventOrganizerContact: {
-      name: "Anna De Silva",
-      email: "anna@elegantevents.com",
-      phone: "+94 71 987 6543"
-    },
-    // Additional fields
-    serviceLocations: ["Colombo", "Negombo", "Kandy"],
-    coveredEventTypes: ["Wedding", "Corporate Event", "Birthday Party"],
-    slogan: "Making your special day truly elegant",
-    businessDescription: "Elegant Events specializes in luxury event hosting with premium catering and accommodation services for all types of events and celebrations."
-  },
-  {
-    id: "2005",
-    businessName: "Luxe Weddings",
-    ownerName: "Ranjith Perera",
-    email: "ranjith@luxeweddings.com",
-    username: "ranjithperera",
-    contactNumber: "+94 77 345 6789",
-    nicNumber: "895678123V",
-    businessRegNumber: "REG45678912",
-    location: "Colombo",
-    serviceType: ["Wedding Planning", "Decoration"],
-    status: "Active",
-    profileImage: "https://i.pravatar.cc/300?img=33",
-    coverPhoto: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1200",
-    nicFrontImage: "https://images.unsplash.com/photo-1599022160646-a0a8c4407277?q=80&w=400&auto=format",
-    nicBackImage: "https://images.unsplash.com/photo-1599022160619-9d26661c68ef?q=80&w=400&auto=format",
-    eventOrganizerContact: {
-      name: "Kumari Fernando",
-      email: "kumari@luxeweddings.com",
-      phone: "+94 76 234 5678"
-    },
-    // Additional fields
-    serviceLocations: ["Colombo", "Galle", "Matara"],
-    coveredEventTypes: ["Wedding", "Engagement", "Anniversary"],
-    slogan: "Your dream wedding, our expertise",
-    businessDescription: "Luxe Weddings offers premium wedding planning services including venue decoration, catering coordination, and complete event management for your special day."
-  },
-  {
-    id: "2006",
-    businessName: "Carnival Entertainment",
-    ownerName: "Malik Jayawardena",
-    email: "malik@carnival.com",
-    username: "malikjaya",
-    contactNumber: "+94 75 234 5643",
-    nicNumber: "923456789V",
-    businessRegNumber: "",
-    location: "Negombo",
-    serviceType: ["Entertainment", "DJ"],
-    status: "Active",
-    profileImage: "https://i.pravatar.cc/300?img=12",
-    coverPhoto: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1200",
-    nicFrontImage: "https://images.unsplash.com/photo-1599022160646-a0a8c4407277?q=80&w=400&auto=format",
-    nicBackImage: null,
-    eventOrganizerContact: {
-      name: "Saman Perera",
-      email: "saman@carnival.com",
-      phone: "+94 71 456 7890"
-    },
-    // Additional fields
-    serviceLocations: ["Negombo", "Colombo", "Chilaw"],
-    coveredEventTypes: ["Wedding", "Corporate Event", "Concert", "DJ Night"],
-    slogan: "Creating unforgettable entertainment experiences",
-    businessDescription: "Carnival Entertainment provides DJ services, live bands, and interactive entertainment options for all types of events with state-of-the-art sound and lighting equipment."
-  },
-  {
-    id: "2007",
-    businessName: "Coastal Venues",
-    ownerName: "Tharushi Silva",
-    email: "tharushi@coastalvenues.com",
-    username: "tharushisilva",
-    contactNumber: "+94 75 567 8901",
-    nicNumber: "967890123V",
-    businessRegNumber: "REG34567890",
-    location: "Galle",
-    serviceType: ["Venue", "Hotel"],
-    status: "Active",
-    profileImage: "https://i.pravatar.cc/300?img=25",
-    coverPhoto: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1200",
-    nicFrontImage: "https://images.unsplash.com/photo-1599022160646-a0a8c4407277?q=80&w=400&auto=format",
-    nicBackImage: "https://images.unsplash.com/photo-1599022160619-9d26661c68ef?q=80&w=400&auto=format",
-    eventOrganizerContact: {
-      name: "Nimal Fernando",
-      email: "nimal@coastalvenues.com",
-      phone: "+94 77 890 1234"
-    },
-    // Additional fields
-    serviceLocations: ["Galle", "Matara", "Hambantota"],
-    coveredEventTypes: ["Wedding", "Corporate Retreat", "Beach Party"],
-    slogan: "Experience luxury by the ocean",
-    businessDescription: "Coastal Venues offers beachfront properties and hotels perfect for weddings, corporate events, and private celebrations with stunning ocean views and full-service accommodations."
-  },
-  {
-    id: "2008",
-    businessName: "Mountain Retreat",
-    ownerName: "Kasun Bandara",
-    email: "kasun@mountainretreat.com",
-    username: "kasunbandara",
-    contactNumber: "+94 76 678 9012",
-    nicNumber: "945678123V",
-    businessRegNumber: "REG23456789",
-    location: "Nuwara Eliya",
-    serviceType: ["Venue", "Accommodation"],
-    status: "Active",
-    profileImage: "https://i.pravatar.cc/300?img=15",
-    coverPhoto: "https://images.unsplash.com/photo-1505944270255-72b8c68c6a70?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=1200",
-    nicFrontImage: "https://images.unsplash.com/photo-1599022160646-a0a8c4407277?q=80&w=400&auto=format",
-    nicBackImage: "https://images.unsplash.com/photo-1599022160619-9d26661c68ef?q=80&w=400&auto=format",
-    eventOrganizerContact: {
-      name: "Chamara Rathnayake",
-      email: "chamara@mountainretreat.com",
-      phone: "+94 71 789 0123"
-    },
-    // Additional fields
-    serviceLocations: ["Nuwara Eliya", "Kandy", "Hatton"],
-    coveredEventTypes: ["Wedding", "Corporate Retreat", "Honeymoon", "Family Gathering"],
-    slogan: "Elevate your event in the highlands",
-    businessDescription: "Mountain Retreat provides serene event venues and accommodations in the cool climate of Nuwara Eliya with panoramic mountain views, perfect for intimate weddings and corporate retreats."
-  }
-];
-
 const AdminServiceProviders = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const providersPerPage = 10;
 
+  // Fetch service providers on component mount
+  useEffect(() => {
+    const fetchServiceProviders = async () => {
+      try {
+        setIsLoading(true);
+        const providersData = await adminService.getApprovedServiceProviders();
+        
+        // Transform the data to match our ServiceProvider type
+        const formattedProviders = providersData.map(provider => ({
+          id: provider.id,
+          name: provider.provider_name || '',
+          businessName: provider.business_name || '',
+          email: provider.contact_email || '',
+          username: '',
+          contactNumber: provider.contact_phone || '',
+          nicNumber: provider.nic_number || '',
+          businessRegNumber: provider.business_registration_number || '',
+          location: provider.city || '',
+          serviceType: provider.service_types ? provider.service_types.split(',') : [],
+          // Keep the original approval_status value for dialog component
+          status: provider.approval_status || 'pending',
+          profileImage: provider.profile_picture_url || '',
+          coverPhoto: provider.cover_photo_url || '',
+          nicFrontImage: provider.nic_front_image_url || '',
+          nicBackImage: provider.nic_back_image_url || '',
+          business_description: provider.business_description || '',
+          serviceLocations: provider.service_locations || [],
+          coveredEventTypes: provider.covered_event_types || [],
+          slogan: provider.slogan || '',
+          // Include financial information
+          bankName: provider.bank_name || '',
+          branchName: provider.branch_name || '',
+          accountNumber: provider.account_number || '',
+          accountOwnerName: provider.account_owner_name || '',
+          // Registration date
+          registrationDate: provider.created_at || new Date().toISOString(),
+          // Adding event organizer contact info with defaults in case it's missing
+          eventOrganizerContact: {
+            name: provider.provider_name || '',
+            email: provider.contact_email || '',
+            phone: provider.contact_phone || ''
+          }
+        }));
+        
+        setServiceProviders(formattedProviders);
+      } catch (error) {
+        console.error("Error fetching service providers:", error);
+        toast.error("Failed to load service providers");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServiceProviders();
+  }, []);
+
   // Filter providers based on search query
-  const filteredProviders = mockServiceProviders.filter(provider => 
+  const filteredProviders = serviceProviders.filter(provider => 
     provider.businessName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    provider.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     provider.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     provider.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
     provider.serviceType.some(type => type.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -226,60 +148,67 @@ const AdminServiceProviders = () => {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="h-10 px-4 text-left align-middle font-medium">ID</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium">Business Name</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium">Owner</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium">Services</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium">Location</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentProviders.length > 0 ? (
-                  currentProviders.map((provider) => (
-                    <tr key={provider.id} className="border-b hover:bg-muted/50">
-                      <td className="p-4">#{provider.id}</td>
-                      <td className="p-4">{provider.businessName}</td>
-                      <td className="p-4">{provider.ownerName}</td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1">
-                          {provider.serviceType.map((service) => (
-                            <Badge key={service} variant="outline" className="bg-blue-50 text-blue-800">
-                              {service}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4">{provider.location}</td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleViewProvider(provider)}
-                            className="flex items-center gap-1"
-                          >
-                            <User size={14} />
-                            View
-                          </Button>
-                        </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <span className="ml-2 text-gray-500">Loading service providers...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="h-10 px-4 text-left align-middle font-medium">ID</th>
+                    <th className="h-10 px-4 text-left align-middle font-medium">Business Name</th>
+                    <th className="h-10 px-4 text-left align-middle font-medium">Owner</th>
+                    <th className="h-10 px-4 text-left align-middle font-medium">Services</th>
+                    <th className="h-10 px-4 text-left align-middle font-medium">Location</th>
+                    <th className="h-10 px-4 text-left align-middle font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentProviders.length > 0 ? (
+                    currentProviders.map((provider) => (
+                      <tr key={provider.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">#{provider.id}</td>
+                        <td className="p-4">{provider.businessName}</td>
+                        <td className="p-4">{provider.name}</td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {provider.serviceType.map((service) => (
+                              <Badge key={service} variant="outline" className="bg-blue-50 text-blue-800">
+                                {service}
+                              </Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-4">{provider.location}</td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleViewProvider(provider)}
+                              className="flex items-center gap-1"
+                            >
+                              <User size={14} />
+                              View
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        {searchQuery ? "No service providers found matching your search." : "No service providers available."}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      No service providers found matching your search.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
           
           {/* Pagination Controls */}
           {filteredProviders.length > 0 && (
@@ -359,7 +288,7 @@ const AdminServiceProviders = () => {
         </CardContent>
       </Card>
 
-      {/* Using AdminServiceProviderView wrapper instead of ServiceProviderDetailsDialog directly */}
+      {/* Using AdminServiceProviderView wrapper */}
       <AdminServiceProviderView 
         isOpen={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}

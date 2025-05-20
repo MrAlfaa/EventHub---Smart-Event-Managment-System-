@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,12 +25,14 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import providerBookingService from "@/services/providerBookingService";
 
 // Special date interface
 interface SpecialDate {
   date: Date;
   type: 'unavailable' | 'booked';
   note?: string;
+  bookingId?: string; // Added to track which booking this date is for
 }
 
 // Schema for special date form
@@ -44,28 +46,61 @@ type SpecialDateFormValues = z.infer<typeof specialDateFormSchema>;
 export const ManageAvailabilityTab: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [showAddSpecialDateDialog, setShowAddSpecialDateDialog] = useState(false);
-  const [specialDates, setSpecialDates] = useState<SpecialDate[]>([
-    {
-      date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-      type: 'unavailable',
-      note: 'Personal leave'
-    },
-    {
-      date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-      type: 'booked',
-      note: 'Event already booked'
-    }
-  ]);
-
+  const [specialDates, setSpecialDates] = useState<SpecialDate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   
   const form = useForm<SpecialDateFormValues>({
     resolver: zodResolver(specialDateFormSchema),
     defaultValues: {
-      type: 'booked',
+      type: 'unavailable',
       note: '',
     },
   });
+
+  // Fetch booking data when component mounts
+  useEffect(() => {
+    fetchBookedDates();
+  }, []);
+
+  // Function to fetch booked dates from bookings
+  const fetchBookedDates = async () => {
+    setIsLoading(true);
+    try {
+      // Get all provider bookings
+      const bookings = await providerBookingService.getProviderBookings();
+      
+      // Only consider pending and confirmed bookings
+      const validBookings = bookings.filter(booking => 
+        booking.status === 'pending' || booking.status === 'confirmed'
+      );
+      
+      // Convert bookings to special dates
+      const bookedDates: SpecialDate[] = validBookings.map(booking => ({
+        date: new Date(booking.bookingDate),
+        type: 'booked',
+        note: `Booked: ${booking.packageName} for ${booking.customerName}`,
+        bookingId: booking.bookingId
+      }));
+      
+      // Merge with manually added special dates
+      // Only keep manually added special dates that don't conflict with booking dates
+      const manualDates = specialDates.filter(date => 
+        date.bookingId === undefined && 
+        !bookedDates.some(booked => 
+          booked.date.toDateString() === date.date.toDateString()
+        )
+      );
+      
+      setSpecialDates([...bookedDates, ...manualDates]);
+      toast.success('Calendar updated with your bookings');
+    } catch (error) {
+      console.error("Error fetching booked dates:", error);
+      toast.error('Failed to load your booked dates');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Function to get date modifier classes for highlighting
   const getDateModifiers = () => {
@@ -84,6 +119,17 @@ export const ManageAvailabilityTab: React.FC = () => {
   // Add a special date
   const handleAddSpecialDate = (data: SpecialDateFormValues) => {
     if (!selectedDate) return;
+    
+    // Check if this date has a booking already
+    const existingBooking = specialDates.find(
+      date => date.date.toDateString() === selectedDate.toDateString() && date.bookingId
+    );
+    
+    if (existingBooking) {
+      toast.error("This date already has a booking and cannot be modified manually");
+      setShowAddSpecialDateDialog(false);
+      return;
+    }
     
     const newSpecialDate: SpecialDate = {
       date: selectedDate,
@@ -114,6 +160,16 @@ export const ManageAvailabilityTab: React.FC = () => {
 
   // Remove a special date
   const handleRemoveSpecialDate = (dateToRemove: Date) => {
+    // Check if this date has a booking
+    const existingDate = specialDates.find(
+      date => date.date.toDateString() === dateToRemove.toDateString()
+    );
+    
+    if (existingDate && existingDate.bookingId) {
+      toast.error("Cannot remove a date with an active booking");
+      return;
+    }
+    
     setSpecialDates(specialDates.filter(
       date => date.date.toDateString() !== dateToRemove.toDateString()
     ));
@@ -125,6 +181,16 @@ export const ManageAvailabilityTab: React.FC = () => {
     if (!date) return;
     
     setSelectedDate(date);
+    
+    // Check if this date has a booking
+    const existingBooking = specialDates.find(
+      specialDate => specialDate.date.toDateString() === date.toDateString() && specialDate.bookingId
+    );
+    
+    if (existingBooking) {
+      toast.info("This date has a booking and cannot be modified");
+      return;
+    }
     
     // Check if this date already has special settings
     const existingDate = specialDates.find(
@@ -140,7 +206,7 @@ export const ManageAvailabilityTab: React.FC = () => {
     } else {
       // Reset form to defaults
       form.reset({
-        type: 'booked',
+        type: 'unavailable',
         note: '',
       });
     }
@@ -150,9 +216,11 @@ export const ManageAvailabilityTab: React.FC = () => {
 
   // Reset availability to defaults
   const resetAvailability = () => {
-    if (window.confirm('Are you sure you want to reset all availability settings? This cannot be undone.')) {
-      setSpecialDates([]);
-      toast.success('All dates reset to available');
+    if (window.confirm('Are you sure you want to reset all manually set availability? Booked dates will remain unavailable.')) {
+      // Keep only booking-related dates
+      const bookedDates = specialDates.filter(date => date.bookingId !== undefined);
+      setSpecialDates(bookedDates);
+      toast.success('All manually set dates reset to available');
     }
   };
 
@@ -164,7 +232,11 @@ export const ManageAvailabilityTab: React.FC = () => {
     }
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: string, hasBooking: boolean = false) => {
+    if (hasBooking) {
+      return 'bg-purple-50 border-purple-200 text-purple-700';
+    }
+    
     switch(type) {
       case 'unavailable': return 'bg-red-50 border-red-200 text-red-700';
       case 'booked': return 'bg-blue-50 border-blue-200 text-blue-700';
@@ -181,7 +253,7 @@ export const ManageAvailabilityTab: React.FC = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle>Manage Availability</CardTitle>
-                  <CardDescription>Mark dates as unavailable or booked</CardDescription>
+                  <CardDescription>Mark dates as unavailable or view booked dates</CardDescription>
                 </div>
                 <div className="flex space-x-2">
                   <Button 
@@ -198,59 +270,72 @@ export const ManageAvailabilityTab: React.FC = () => {
                   >
                     Week
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchBookedDates}
+                  >
+                    Refresh
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md p-4">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  className="p-0"
-                  modifiers={getDateModifiers()}
-                  modifiersStyles={{
-                    unavailable: { 
-                      backgroundColor: "#fee2e2", 
-                      color: "#ef4444",
-                      fontWeight: "bold" 
-                    },
-                    booked: { 
-                      backgroundColor: "#dbeafe", 
-                      color: "#2563eb",
-                      fontWeight: "bold" 
-                    }
-                  }}
-                  footer={
-                    <div className="mt-4 pt-4 border-t flex justify-between">
-                      <div className="flex gap-4 text-xs">
-                        <div className="flex items-center gap-1">
-                          <div className="h-3 w-3 rounded-full bg-white border"></div>
-                          <span>Available</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="h-3 w-3 rounded-full bg-red-200"></div>
-                          <span>Unavailable</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="h-3 w-3 rounded-full bg-blue-200"></div>
-                          <span>Booked</span>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-80">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+                </div>
+              ) : (
+                <div className="border rounded-md p-4">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    className="p-0"
+                    modifiers={getDateModifiers()}
+                    modifiersStyles={{
+                      unavailable: { 
+                        backgroundColor: "#fee2e2", 
+                        color: "#ef4444",
+                        fontWeight: "bold" 
+                      },
+                      booked: { 
+                        backgroundColor: "#dbeafe", 
+                        color: "#2563eb",
+                        fontWeight: "bold" 
+                      }
+                    }}
+                    footer={
+                      <div className="mt-4 pt-4 border-t flex justify-between">
+                        <div className="flex gap-4 text-xs">
+                          <div className="flex items-center gap-1">
+                            <div className="h-3 w-3 rounded-full bg-white border"></div>
+                            <span>Available</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="h-3 w-3 rounded-full bg-red-200"></div>
+                            <span>Unavailable</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="h-3 w-3 rounded-full bg-blue-200"></div>
+                            <span>Booked</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  }
-                />
-              </div>
+                    }
+                  />
+                </div>
+              )}
 
               {/* Instructions */}
               <div className="mt-4 p-4 bg-blue-50 rounded-md text-sm">
                 <p><strong>How to use:</strong></p>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                   <li>All dates are available by default (white background)</li>
-                  <li>Click on any date to mark it as unavailable or booked</li>
+                  <li>Dates with active bookings are automatically marked as booked (blue)</li>
+                  <li>Click on any available date to mark it as unavailable</li>
                   <li>Add notes to remember why a date is marked</li>
-                  <li>Dates marked as "Unavailable" will not be bookable by clients</li>
-                  <li>Dates marked as "Booked" are already reserved for events</li>
+                  <li>Dates with bookings cannot be modified manually</li>
                   <li>To make a date available again, remove it from the Special Dates list</li>
                 </ul>
               </div>
@@ -270,7 +355,7 @@ export const ManageAvailabilityTab: React.FC = () => {
                   {specialDates.map((specialDate, index) => (
                     <div 
                       key={index} 
-                      className={`p-3 rounded-md border ${getTypeColor(specialDate.type)}`}
+                      className={`p-3 rounded-md border ${getTypeColor(specialDate.type, !!specialDate.bookingId)}`}
                     >
                       <div className="flex justify-between items-start">
                         <div>
@@ -283,21 +368,27 @@ export const ManageAvailabilityTab: React.FC = () => {
                             })}
                           </p>
                           <p className="text-xs font-medium">
-                            {getTypeLabel(specialDate.type)}
+                            {specialDate.bookingId ? "Booking" : getTypeLabel(specialDate.type)}
                           </p>
-                          {specialDate.note && (
-                            <p className="text-xs mt-1 italic">{specialDate.note}</p>
+                          {specialDate.note && (                            <p className="text-xs mt-1 italic">{specialDate.note}</p>
+                          )}
+                          {specialDate.bookingId && (
+                            <div className="mt-1 text-xs bg-white/50 rounded px-1 py-0.5 inline-block">
+                              Booking #{specialDate.bookingId.slice(-6)}
+                            </div>
                           )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleRemoveSpecialDate(specialDate.date)}
-                          title="Make date available again"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                        {!specialDate.bookingId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleRemoveSpecialDate(specialDate.date)}
+                            title="Make date available again"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -316,7 +407,7 @@ export const ManageAvailabilityTab: React.FC = () => {
                   className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
                   onClick={resetAvailability}
                 >
-                  Reset All to Available
+                  Reset Manual Dates
                 </Button>
               </div>
             </CardContent>
@@ -356,7 +447,6 @@ export const ManageAvailabilityTab: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="unavailable">Unavailable</SelectItem>
-                          <SelectItem value="booked">Booked</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>
@@ -395,3 +485,4 @@ export const ManageAvailabilityTab: React.FC = () => {
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
@@ -12,12 +12,13 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface BookingFormProps {
   isOpen: boolean;
   onClose: () => void;
   selectedPackage: Package;
-  onComplete: (details: any) => void;  // Add this line
+  onComplete: (details: any) => void;
 }
 
 export const BookingForm: React.FC<BookingFormProps> = ({
@@ -26,6 +27,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
   selectedPackage,
   onComplete
 }) => {
+  const { user } = useAuthStore();
   const [fullName, setFullName] = useState('');
   const [nic, setNic] = useState('');
   const [phone, setPhone] = useState('');
@@ -40,10 +42,20 @@ export const BookingForm: React.FC<BookingFormProps> = ({
   );
   const [eventDate, setEventDate] = useState<Date | undefined>(undefined);
   
+  // Auto-fill user details
+  useEffect(() => {
+    if (user) {
+      setFullName(user.name || '');
+      setPhone(user.phone || '');
+      setEmail(user.email || '');
+      setAddress(user.address || '');
+    }
+  }, [user, isOpen]);
+  
   // Calculate advanced payment (assumed to be 20% of total package price)
   const advancedPaymentPercentage = 20;
   const advancedPaymentAmount = selectedPackage 
-    ? (selectedPackage.price * advancedPaymentPercentage / 100) 
+    ? Math.round(selectedPackage.price * advancedPaymentPercentage / 100) 
     : 0;
   
   // Form validation
@@ -95,10 +107,16 @@ export const BookingForm: React.FC<BookingFormProps> = ({
         packageId: selectedPackage.id,
         packageName: selectedPackage.name,
         totalAmount: selectedPackage.price,
-        advancedAmount: advancedPaymentAmount
+        advancedAmount: advancedPaymentAmount,
+        currency: selectedPackage.currency || "LKR"
       };
 
-      onComplete(bookingData); // Call onComplete with the booking data
+      onComplete(bookingData);
+    
+      // Show a toast notification
+      toast.success(`Booking request sent! The service provider will be notified.`, {
+        duration: 5000,
+      });
     } else {
       // Scroll to the first error
       const firstErrorField = Object.keys(errors)[0];
@@ -126,7 +144,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6" aria-label="Event Booking Form">
           {/* Package summary */}
           <Card className="bg-blue-50/50">
             <CardHeader className="pb-2">
@@ -175,6 +193,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className={errors.fullName ? "border-red-500" : ""}
+                  aria-label="Full Name"
                 />
                 {errors.fullName && <p className="text-sm text-red-500">{errors.fullName}</p>}
               </div>
@@ -187,6 +206,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={nic}
                   onChange={(e) => setNic(e.target.value)}
                   className={errors.nic ? "border-red-500" : ""}
+                  aria-label="NIC Number"
                 />
                 {errors.nic && <p className="text-sm text-red-500">{errors.nic}</p>}
               </div>
@@ -199,6 +219,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className={errors.phone ? "border-red-500" : ""}
+                  aria-label="Phone Number"
                 />
                 {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
               </div>
@@ -212,6 +233,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={errors.email ? "border-red-500" : ""}
+                  aria-label="Email Address"
                 />
                 {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
               </div>
@@ -234,6 +256,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   placeholder="e.g., John Silva"
                   value={coordinatorName}
                   onChange={(e) => setCoordinatorName(e.target.value)}
+                  aria-label="Coordinator Name"
                 />
               </div>
               
@@ -244,6 +267,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   placeholder="e.g., 0712345678"
                   value={coordinatorContact}
                   onChange={(e) => setCoordinatorContact(e.target.value)}
+                  aria-label="Coordinator Contact Number"
                 />
               </div>
             </div>
@@ -266,6 +290,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className={errors.address ? "border-red-500" : ""}
+                  aria-label="Your Address"
                 />
                 {errors.address && <p className="text-sm text-red-500">{errors.address}</p>}
               </div>
@@ -278,6 +303,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   value={eventLocation}
                   onChange={(e) => setEventLocation(e.target.value)}
                   className={errors.eventLocation ? "border-red-500" : ""}
+                  aria-label="Event Location"
                 />
                 {errors.eventLocation && <p className="text-sm text-red-500">{errors.eventLocation}</p>}
               </div>
@@ -289,6 +315,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                   placeholder="e.g., https://maps.google.com/?q=..."
                   value={mapLink}
                   onChange={(e) => setMapLink(e.target.value)}
+                  aria-label="Google Maps Link"
                 />
                 <p className="text-xs text-gray-500">Providing a map link helps the service provider locate the venue easily.</p>
               </div>
@@ -326,6 +353,8 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                         }
                       }
                     }}
+                    aria-label="Event Date"
+                    title="Select event date"
                   />
                   <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -342,6 +371,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
                     value={crowdSize}
                     onChange={(e) => setCrowdSize(e.target.value ? parseInt(e.target.value) : '')}
                     className={errors.crowdSize ? "border-red-500" : ""}
+                    aria-label="Crowd Size"
                   />
                   <span className="text-gray-500">People</span>
                 </div>
@@ -367,6 +397,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
               id="specialRequirements" 
               placeholder="Enter any special requirements or notes for your event"
               rows={4}
+              aria-label="Special Requirements"
             />
           </div>
           
@@ -393,7 +424,6 @@ export const BookingForm: React.FC<BookingFormProps> = ({
         </form>
       </DialogContent>
     </Dialog>
-  );
-};
+  );};
 
 export default BookingForm;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
@@ -6,7 +6,8 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react";
 import { 
   Dialog, 
@@ -19,72 +20,8 @@ import {
 import AddPackageForm from "./AddPackageForm";
 import { ServiceProviderPackage } from "@/types";
 import { Badge } from "@/components/ui/badge";
-
-// Updated Package interface
-interface Package extends ServiceProviderPackage {
-  duration?: string; // Optional for backward compatibility
-}
-
-// Sample package data
-const samplePackages: Package[] = [
-  {
-    id: "1",
-    name: "Wedding Package 1",
-    description: "This comprehensive wedding package includes everything needed for your special day.",
-    price: 150000,
-    currency: "LKR",
-    features: ["Photography", "Catering", "Venue Decoration", "Music"],
-    duration: "8 hours", // Note: This is not in the ServiceProviderPackage interface, but included for backward compatibility
-    crowdSizeMax: 100,
-    crowdSizeMin: 50,
-    eventTypes: ["Wedding", "Engagement"],
-    images: [
-      "https://images.unsplash.com/photo-1519741497674-611481863552?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1469&q=80"
-    ],
-    status: "active",
-    bookings: 5
-  },
-  {
-    id: "2",
-    name: "Wedding Package 2",
-    description: "Premium wedding package with exclusive features and services for a memorable experience.",
-    price: 300000,
-    currency: "LKR",
-    features: ["Photography & Videography", "Premium Catering", "Luxury Venue Setup", "Live Band", "Transportation"],
-    duration: "12 hours",
-    crowdSizeMax: 200,
-    crowdSizeMin: 100,
-    eventTypes: ["Wedding", "Anniversary"],
-    images: [
-      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      "https://images.unsplash.com/photo-1522673607200-164d1b3ce551?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80"
-    ],
-    status: "active",
-    bookings: 3
-  },
-  {
-    id: "3",
-    name: "Wedding Package 3",
-    description: "Deluxe package for the most extravagant wedding celebration with all premium features included.",
-    price: 450000,
-    currency: "LKR",
-    features: ["Full Photography & Videography Team", "Gourmet Catering", "Custom Venue Design", "Live Orchestra", "Transportation", "Accommodation"],
-    duration: "Full Day",
-    crowdSizeMax: 300,
-    crowdSizeMin: 150,
-    eventTypes: ["Wedding", "Engagement", "Anniversary"],
-    images: [
-      "https://images.unsplash.com/photo-1523438097201-512ae7d59c44?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1472&q=80",
-      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1498&q=80",
-      "https://images.unsplash.com/photo-1507504031003-b417219a0fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80",
-      "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1469&q=80"
-    ],
-    status: "active",
-    bookings: 1
-  }
-];
+import { toast } from "sonner";
+import providerPackageService from "@/services/providerPackageService";
 
 // Image Carousel Component
 const ImageCarousel = ({ images }: { images: string[] }) => {
@@ -194,52 +131,107 @@ const ImageGallery = ({ images }: { images: string[] }) => {
 };
 
 const ProviderPackages = () => {
-  const [packages, setPackages] = useState<Package[]>(samplePackages);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packages, setPackages] = useState<ServiceProviderPackage[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<ServiceProviderPackage | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch packages on component mount
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+  
+  // Fetch packages from the API
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      const data = await providerPackageService.getPackages();
+      setPackages(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching packages:", err);
+      setError("Failed to load packages. Please try again later.");
+      toast.error("Failed to load packages");
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Handle view package details
-  const handleViewPackage = (pkg: Package) => {
+  const handleViewPackage = (pkg: ServiceProviderPackage) => {
     setSelectedPackage(pkg);
     setShowViewDialog(true);
   };
 
   // Handle edit package
-  const handleEditPackage = (pkg: Package) => {
+  const handleEditPackage = (pkg: ServiceProviderPackage) => {
     setSelectedPackage(pkg);
     setShowEditDialog(true);
   };
 
   // Handle delete package
-  const handleDeletePackage = (pkg: Package) => {
+  const handleDeletePackage = (pkg: ServiceProviderPackage) => {
     setSelectedPackage(pkg);
     setShowDeleteDialog(true);
   };
   
   // Add new package
-  const handleAddPackage = (packageData: ServiceProviderPackage) => {    
-    setPackages(prev => [...prev, packageData as Package]);
-    setShowAddDialog(false);
+  const handleAddPackage = async (packageData: ServiceProviderPackage) => {
+    try {
+      // Create package in the backend
+      const newPackage = await providerPackageService.createPackage(packageData);
+      
+      // Update local state
+      setPackages(prev => [...prev, newPackage]);
+      setShowAddDialog(false);
+      toast.success("Package added successfully");
+    } catch (err) {
+      console.error("Error adding package:", err);
+      toast.error("Failed to add package. Please try again.");
+    }
   };
   
   // Update existing package
-  const handleUpdatePackage = (packageData: ServiceProviderPackage) => {
-    setPackages(prev => 
-      prev.map(pkg => pkg.id === packageData.id ? 
-        {...packageData, duration: pkg.duration} as Package : pkg)
-    );
-    setShowEditDialog(false);
+  const handleUpdatePackage = async (packageData: ServiceProviderPackage) => {
+    try {
+      // Update package in the backend
+      const updatedPackage = await providerPackageService.updatePackage(
+        packageData.id, 
+        packageData
+      );
+      
+      // Update local state
+      setPackages(prev => 
+        prev.map(pkg => pkg.id === updatedPackage.id ? updatedPackage : pkg)
+      );
+      setShowEditDialog(false);
+      toast.success("Package updated successfully");
+    } catch (err) {
+      console.error("Error updating package:", err);
+      toast.error("Failed to update package. Please try again.");
+    }
   };
 
   // Confirm delete package
-  const confirmDeletePackage = () => {
-    if (selectedPackage) {
+  const confirmDeletePackage = async () => {
+    if (!selectedPackage) return;
+    
+    try {
+      // Delete package from the backend
+      await providerPackageService.deletePackage(selectedPackage.id);
+      
+      // Update local state
       setPackages(prev => prev.filter(pkg => pkg.id !== selectedPackage.id));
+      setShowDeleteDialog(false);
+      toast.success("Package deleted successfully");
+    } catch (err) {
+      console.error("Error deleting package:", err);
+      toast.error("Failed to delete package. Please try again.");
     }
-    setShowDeleteDialog(false);
   };
 
   // Format currency
@@ -250,6 +242,29 @@ const ProviderPackages = () => {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-[400px] w-full items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
+          <p className="mt-2 text-gray-500">Loading packages...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[400px] w-full items-center justify-center">
+        <div className="text-center max-w-md">
+          <h3 className="text-lg font-medium text-gray-900">Failed to load packages</h3>
+          <p className="mt-2 text-gray-500">{error}</p>
+          <Button className="mt-4" onClick={fetchPackages}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -363,7 +378,7 @@ const ProviderPackages = () => {
               <div className="space-y-6">
                 <div className="space-y-3 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl">
                   <div className="flex items-start justify-between">
-                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">{selectedPackage.name}</h2>
+                                       <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">{selectedPackage.name}</h2>
                     <div className="text-xl font-semibold px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-sm">
                       {formatCurrency(selectedPackage.price, selectedPackage.currency)}
                     </div>
@@ -398,16 +413,20 @@ const ProviderPackages = () => {
                 </div>
                 
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-xl shadow-sm">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Features</h4>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {selectedPackage.features.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-white px-3 py-2 rounded-md shadow-sm border border-blue-100 hover:border-blue-300 transition-colors">
-                        <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-                        <span className="text-gray-800">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+  <h4 className="text-sm font-semibold text-gray-700 mb-3">Features</h4>
+  {selectedPackage.features && selectedPackage.features.length > 0 ? (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {selectedPackage.features.map((feature, index) => (
+        <div key={index} className="flex items-center gap-2 bg-white px-3 py-2 rounded-md shadow-sm border border-blue-100 hover:border-blue-300 transition-colors">
+          <div className="h-2 w-2 rounded-full bg-blue-600"></div>
+          <span className="text-gray-800">{feature}</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-gray-500 italic">No features specified</p>
+  )}
+</div>
               </div>
             </div>
           )}
@@ -480,3 +499,4 @@ const ProviderPackages = () => {
 };
 
 export default ProviderPackages;
+

@@ -1,11 +1,11 @@
+import { Card, CardContent } from "@/components/ui/card";
+import { ServiceProvider } from "@/types/index";
 import { Button } from "@/components/ui/button";
-import { ServiceProvider } from "@/types";
-import { Calendar as CalendarIcon, Check, Info } from "lucide-react";
-import { useApp } from "@/providers/AppProvider";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
-import { format, isValid, parse } from "date-fns";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { Loader, CheckCircle } from "lucide-react";
+import providerService from "@/services/providerService";
 
 interface AvailabilityTabProps {
   provider: ServiceProvider;
@@ -14,130 +14,207 @@ interface AvailabilityTabProps {
   onBookNow: () => void;
 }
 
+interface UnavailableDate {
+  date: Date;
+  type: string;
+  note?: string;
+}
+
 export const AvailabilityTab = ({ 
   provider, 
   selectedDate, 
   onDateSelect, 
   onBookNow 
 }: AvailabilityTabProps) => {
-  // Convert string dates to Date objects for the calendar
-  const availableDatesAsObjects = provider.availableDates.map(date => 
-    new Date(date)
+  const [date, setDate] = useState<Date | undefined>(
+    selectedDate ? new Date(selectedDate) : undefined
   );
+  const [isLoading, setIsLoading] = useState(false);
+  const [unavailableDates, setUnavailableDates] = useState<UnavailableDate[]>([]);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   
-  const bookedDatesAsObjects = provider.bookedDates?.map(date => 
-    new Date(date)
-  ) || [];
+  // Fetch provider's availability data
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (provider && provider.id) {
+        setIsLoading(true);
+        try {
+          const availabilityData = await providerService.getProviderAvailability(provider.id);
+          
+          // Convert availability data to the format needed for calendar
+          const formattedDates = availabilityData.map((item: any) => ({
+            date: new Date(item.date),
+            type: item.type || 'unavailable',
+            note: item.note
+          }));
+          
+          setUnavailableDates(formattedDates);
+        } catch (error) {
+          console.error("Failed to fetch availability:", error);
+          toast.error("Couldn't load provider's availability");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    fetchAvailability();
+  }, [provider]);
   
-  // Parse the selected date string to a Date object if it exists
-  const selectedDateObject = selectedDate ? new Date(selectedDate) : null;
+  // Check if selected date is available
+  useEffect(() => {
+    if (date) {
+      const dateString = date.toDateString();
+      const unavailable = unavailableDates.some(
+        unavailableDate => unavailableDate.date.toDateString() === dateString
+      );
+      setIsAvailable(!unavailable);
+    } else {
+      setIsAvailable(null);
+    }
+  }, [date, unavailableDates]);
   
-  // Function to determine if a date is available
-  const isDateAvailable = (date: Date) => {
-    return availableDatesAsObjects.some(availableDate => 
-      availableDate.toDateString() === date.toDateString()
-    );
-  };
-  
-  // Function to determine if a date is booked
-  const isDateBooked = (date: Date) => {
-    return bookedDatesAsObjects.some(bookedDate => 
-      bookedDate.toDateString() === date.toDateString()
-    );
+  // Function to get date modifiers for the calendar
+  const getDateModifiers = () => {
+    return {
+      unavailable: unavailableDates
+        .filter(d => d.type === 'unavailable' || d.type === 'booked')
+        .map(d => d.date),
+      selected: date ? [date] : []
+    };
   };
 
-  // Function to determine if a date is available and not booked
-  const isDateBookable = (date: Date) => {
-    return isDateAvailable(date) && !isDateBooked(date);
-  };
-  
-  // Custom day rendering to show available/booked status
-  const renderDay = (day: Date) => {
-    const isAvailable = isDateAvailable(day);
-    const isBooked = isDateBooked(day);
-    const isSelected = selectedDateObject && day.toDateString() === selectedDateObject.toDateString();
-    
-    return (
-      <div className={`relative p-1 ${isDateBookable(day) ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-        <div
-          className={`h-8 w-8 rounded-full flex items-center justify-center ${
-            isSelected 
-              ? 'bg-blue-600 text-white' 
-              : isDateBookable(day)
-                ? 'hover:bg-blue-100' 
-                : isBooked 
-                  ? 'bg-red-50 text-red-400 line-through' 
-                  : 'text-gray-400'
-          }`}
-        >
-          {day.getDate()}
-        </div>
-        {isDateBookable(day) && !isSelected && (
-          <div className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500"></div>
-        )}
-      </div>
-    );
-  };
-  
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date && isDateBookable(date)) {
-      // Convert the date object back to a string in the expected format
-      onDateSelect(date.toISOString().split('T')[0]);
+  const handleDateChange = (newDate: Date | undefined) => {
+    setDate(newDate);
+    if (newDate) {
+      // Check if date is available before selecting
+      const dateString = newDate.toDateString();
+      const unavailable = unavailableDates.some(
+        unavailableDate => unavailableDate.date.toDateString() === dateString
+      );
+      
+      if (unavailable) {
+        toast.error("This date is not available for booking");
+        return;
+      }
+      
+      onDateSelect(newDate.toISOString());
+      toast.success("Date selected! Click 'Continue to Packages' to choose a package.");
     }
   };
-
+  
   return (
-    <div className="rounded-lg border bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-xl font-semibold">Available Dates</h2>
-      
-      <p className="mb-4 text-gray-600">
-        Select a date to book this service provider:
-      </p>
-      
-      <div className="mb-6">
-        <Calendar
-          mode="single"
-          selected={selectedDateObject || undefined}
-          onSelect={handleDateSelect}
-          disabled={(date) => !isDateBookable(date)}
-          modifiers={{
-            available: (date) => isDateBookable(date),
-            booked: (date) => isDateBooked(date),
-          }}
-          modifiersClassNames={{
-            available: "text-green-600",
-            booked: "text-red-400 line-through",
-          }}
-          components={{
-            Day: ({ date, ...props }) => renderDay(date),
-          }}
-          className="border rounded-md p-3"
-        />
-      </div>
-      
-      <div className="mb-6 flex flex-wrap gap-3">
-        <div className="flex items-center">
-          <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
-          <span className="text-sm text-gray-600">Available</span>
+    <Card>
+      <CardContent className="p-4 sm:p-6">
+        <h3 className="text-lg font-semibold mb-4">Check Availability</h3>
+        
+        <div className="flex flex-col sm:flex-row gap-6">
+          <div className="flex-1">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-72">
+                <Loader className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-2">Loading availability...</span>
+              </div>
+            ) : (
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={handleDateChange}
+                className="rounded-md border"
+                disabled={{ before: new Date() }}
+                modifiers={getDateModifiers()}
+                modifiersStyles={{
+                  unavailable: { 
+                    backgroundColor: "#fee2e2", 
+                    color: "#ef4444",
+                    textDecoration: "line-through" 
+                  },
+                  selected: {
+                    backgroundColor: "#dbeafe",
+                    color: "#1e40af",
+                    fontWeight: "bold"
+                  }
+                }}
+                footer={
+                  <div className="mt-2 pt-2 border-t text-xs flex justify-start gap-4">
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-full bg-white border"></div>
+                      <span>Available</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-full bg-red-200"></div>
+                      <span>Unavailable</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-full bg-blue-200"></div>
+                      <span>Selected</span>
+                    </div>
+                  </div>
+                }
+              />
+            )}
+          </div>
+          
+          <div className="flex-1">
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <h4 className="font-medium mb-3">Booking Process</h4>
+              <ol className="space-y-3">
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">1</span>
+                  <span>Select an available date on the calendar</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">2</span>
+                  <span>Click 'Continue to Packages' to browse packages</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-300 bg-blue-50 text-xs font-medium text-blue-600 mr-2">3</span>
+                  <span>Choose a package and proceed to checkout</span>
+                </li>
+              </ol>
+            </div>
+            
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Selected Date</h4>
+              {date ? (
+                <>
+                  <p>{date.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</p>
+                  
+                  <div className="mt-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      isAvailable === null ? 'bg-gray-100 text-gray-800' :
+                      isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {isAvailable === null ? 'Select a date' :
+                       isAvailable ? 'Available' : 'Not Available'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500">Please select a date</p>
+              )}
+            </div>
+            
+            <Button 
+              className="w-full mt-4" 
+              disabled={!date || !isAvailable}
+              onClick={onBookNow}
+            >
+              {!date ? 'Select a Date First' : 
+               !isAvailable ? 'This Date is Not Available' : 'Continue to Packages'}
+            </Button>
+            
+            <p className="mt-2 text-xs text-gray-500">
+              Selecting a date doesn't guarantee availability. After booking, the service provider will confirm your event date.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center">
-          <div className="h-3 w-3 rounded-full bg-red-400 mr-2"></div>
-          <span className="text-sm text-gray-600">Booked</span>
-        </div>
-        <div className="flex items-center">
-          <div className="h-3 w-3 rounded-full bg-blue-600 mr-2"></div>
-          <span className="text-sm text-gray-600">Selected</span>
-        </div>
-      </div>
-      
-      <div className="rounded-md bg-blue-50 p-4 text-blue-800">
-        <div className="flex items-start">
-          <Info className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-          <p className="text-sm">
-            <strong>Note:</strong> Only dates shown in green are available for booking. Dates in red are already booked.
-          </p>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

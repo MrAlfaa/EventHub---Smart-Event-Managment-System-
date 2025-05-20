@@ -1,350 +1,299 @@
+import { useState, useEffect } from "react";
 import { ServiceProvider, Package } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Users, Info, ShoppingCart, Tag } from "lucide-react";
-import { useApp } from "@/providers/AppProvider";
-import { useState, useEffect } from "react";
+import { Eye, ShoppingCart,Info, Calendar, ArrowUpDown, Users, DollarSign } from "lucide-react";
+import providerService from "@/services/providerService";
+import { PackageQuickView } from "./PackageQuickView";
 import { toast } from "sonner";
-import PackageQuickView from "./PackageQuickView";
-import SystemBookingForm from "@/components/booking/SystemBookingForm";
+import { useApp } from "@/providers/AppProvider";
+import { useNavigate } from "react-router-dom";
 
 interface PackagesTabProps {
   provider: ServiceProvider;
+  selectedDate?: string | null;
 }
 
-// Mock package data with rich details and multiple images
-const mockPackages: Package[] = [
-  {
-    id: "pkg-001",
-    name: "Premium Wedding Package",
-    description: "A complete wedding package including venue decoration, catering, photography, and music arrangements for your special day. Perfect for medium to large weddings with full-service support.",
-    price: 550000,
-    currency: "LKR",
-    eventType: "Wedding",
-    capacity: {
-      min: 100,
-      max: 300
-    },
-    services: [
-      {
-        serviceProviderId: "sp-001",
-        serviceProviderName: "Elegant Decor",
-        serviceType: "Decoration",
-        description: "Complete venue decoration with floral arrangements",
-        price: 150000
-      },
-      {
-        serviceProviderId: "sp-002",
-        serviceProviderName: "Delicious Catering",
-        serviceType: "Catering",
-        description: "Full buffet menu with 25 items including desserts",
-        price: 200000
-      },
-      {
-        serviceProviderId: "sp-003",
-        serviceProviderName: "MemoryCraft Studios",
-        serviceType: "Photography",
-        description: "Full day photography and videography with drone",
-        price: 120000
-      },
-      {
-        serviceProviderId: "sp-004",
-        serviceProviderName: "Rhythm Masters",
-        serviceType: "Music",
-        description: "DJ and live band for reception",
-        price: 80000
-      }
-    ],
-    thumbnailImage: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?ixlib=rb-4.0.3",
-    images: [
-      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-4.0.3"
-    ],
-    features: [
-      "Complete venue decoration",
-      "Full buffet catering (25 items)",
-      "Photography and videography",
-      "DJ and live music",
-      "Wedding cake",
-      "Bridal dressing",
-      "Invitation cards"
-    ]
-  },
-  {
-    id: "pkg-002",
-    name: "Corporate Conference Package",
-    description: "Comprehensive conference package including venue setup, technical equipment, catering, and event management services ideal for corporate events and business conferences.",
-    price: 375000,
-    currency: "LKR",
-    eventType: "Conference",
-    capacity: {
-      min: 50,
-      max: 200
-    },
-    services: [
-      {
-        serviceProviderId: "sp-005",
-        serviceProviderName: "TechSetup Pro",
-        serviceType: "AV Equipment",
-        description: "Audio-visual setup with projectors and sound system",
-        price: 120000
-      },
-      {
-        serviceProviderId: "sp-002",
-        serviceProviderName: "Delicious Catering",
-        serviceType: "Catering",
-        description: "Breakfast, lunch, and refreshments throughout the day",
-        price: 150000
-      },
-      {
-        serviceProviderId: "sp-006",
-        serviceProviderName: "EventMasters",
-        serviceType: "Event Management",
-        description: "Complete event coordination and management",
-        price: 105000
-      }
-    ],
-    thumbnailImage: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3",
-    images: [
-      "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1503428593586-e225b39bddfe?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1528605248644-14dd04022da1?ixlib=rb-4.0.3"
-    ],
-    features: [
-      "Full venue setup with stage",
-      "Professional AV equipment",
-      "Breakfast and lunch buffet",
-      "Coffee break refreshments",
-      "Registration desk",
-      "Name tags and lanyards",
-      "Conference materials"
-    ]
-  },
-  {
-    id: "pkg-003",
-    name: "Birthday Celebration Package",
-    description: "Complete birthday package with decoration, entertainment, catering, and photography to make your birthday celebration memorable and hassle-free.",
-    price: 175000,
-    currency: "LKR",
-    eventType: "Birthday",
-    capacity: {
-      min: 30,
-      max: 80
-    },
-    services: [
-      {
-        serviceProviderId: "sp-007",
-        serviceProviderName: "Party Poppers",
-        serviceType: "Decoration",
-        description: "Themed decoration with balloons and props",
-        price: 45000
-      },
-      {
-        serviceProviderId: "sp-008",
-        serviceProviderName: "Fun Entertainment",
-        serviceType: "Entertainment",
-        description: "DJ, games, and MC for 4 hours",
-        price: 35000
-      },
-      {
-        serviceProviderId: "sp-009",
-        serviceProviderName: "Sweet Delights",
-        serviceType: "Catering",
-        description: "Food, birthday cake, and beverages",
-        price: 65000
-      },
-      {
-        serviceProviderId: "sp-010",
-        serviceProviderName: "Snap Memories",
-        serviceType: "Photography",
-        description: "Event photography with instant prints",
-        price: 30000
-      }
-    ],
-    thumbnailImage: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-4.0.3",
-    images: [
-      "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?ixlib=rb-4.0.3",
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?ixlib=rb-4.0.3"
-    ],
-    features: [
-      "Themed decoration",
-      "Entertainment with games",
-      "Food and beverage service",
-      "Custom birthday cake",
-      "Photography with prints",
-      "Party favors",
-      "Invitation design"
-    ]
-  }
-];
-
-export const PackagesTab = ({ provider }: PackagesTabProps) => {
-  const { addToCart } = useApp();
+export const PackagesTab = ({ provider, selectedDate }: PackagesTabProps) => {
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
-  const [bookingFormOpen, setBookingFormOpen] = useState(false);
-  
-  // Use packages from provider or mock data if not available
-  const [packages, setPackages] = useState<Package[]>([]);
-  
-  // Image carousel state for each package
-  const [currentImageIndices, setCurrentImageIndices] = useState<Record<string, number>>({});
-  
-  // Set up packages from provider or mock data
+  const { addToCart } = useApp();
+  const navigate = useNavigate();
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   useEffect(() => {
-    if (provider.packages && provider.packages.length > 0) {
-      setPackages(provider.packages);
-    } else {
-      // Use mock data if no packages are available
-      setPackages(mockPackages);
-    }
-  }, [provider]);
+    const fetchPackages = async () => {
+      if (!provider.id) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const packagesData = await providerService.getProviderPackages(provider.id);
+        setPackages(packagesData);
+      } catch (err) {
+        console.error("Error fetching packages:", err);
+        setError("Failed to load packages");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchPackages();
+  }, [provider.id]);
 
   const handleAddToCart = (pkg: Package) => {
-    addToCart(pkg);
+    addToCart({
+      id: pkg.id,
+      providerId: provider.id,
+      packageId: pkg.id,
+      name: provider.name || 'Service Provider',
+      packageName: pkg.name,
+      price: pkg.price,
+      currency: pkg.currency || 'LKR',
+      eventType: pkg.eventType,
+      description: pkg.description,
+      profileImage: provider.profileImage || pkg.images?.[0] || '/placeholder.jpg',
+      capacity: pkg.capacity
+    });
     toast.success(`${pkg.name} added to cart`);
   };
 
   const handleBookNow = (pkg: Package) => {
-    // Store the selected package and open booking form directly
-    setSelectedPackage(pkg);
-    setBookingFormOpen(true);
+    // First add to cart
+    handleAddToCart(pkg);
+    // Then navigate to checkout
+    navigate("/checkout");
   };
 
-  const handleViewDetails = (pkg: Package) => {
+  const openQuickView = (pkg: Package) => {
     setSelectedPackage(pkg);
     setQuickViewOpen(true);
   };
 
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort packages based on current sort settings
+  const sortedPackages = [...packages].sort((a, b) => {
+    if (!sortBy) return 0;
+    
+    let comparison = 0;
+    switch (sortBy) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case 'price':
+        comparison = a.price - b.price;
+        break;
+      case 'eventType':
+        comparison = a.eventType.localeCompare(b.eventType);
+        break;
+      case 'capacity':
+        comparison = a.capacity.max - b.capacity.max;
+        break;
+      default:
+        return 0;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-xl font-semibold mb-4">Service Packages</h3>
+          <div className="py-10 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+            <p className="mt-4 text-gray-500">Loading packages...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-xl font-semibold mb-4">Service Packages</h3>
+          <div className="text-center py-8">
+            <p className="text-red-500">{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const formatPrice = (price: number, currency: string) => {
     return `${price.toLocaleString()} ${currency}`;
   };
-  
-  const nextImage = (packageId: string, images: string[], e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentImageIndices(prev => ({
-      ...prev,
-      [packageId]: ((prev[packageId] || 0) + 1) % images.length
-    }));
-  };
-  
-  const prevImage = (packageId: string, images: string[], e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentImageIndices(prev => ({
-      ...prev,
-      [packageId]: ((prev[packageId] || 0) - 1 + images.length) % images.length
-    }));
-  };
 
   return (
-    <div className="rounded-lg border bg-white p-4 sm:p-6 shadow-sm">
-      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Packages</h2>
-          <p className="text-gray-600 text-sm mt-1">
-            Choose from our curated packages designed for different occasions
-          </p>
-        </div>
-        
-        {packages.length > 0 && (
-          <div className="mt-3 sm:mt-0">
-            <Badge variant="outline" className="bg-blue-50">
-              {packages.length} {packages.length === 1 ? 'Package' : 'Packages'} Available
-            </Badge>
-          </div>
-        )}
-      </div>
-
-      {packages.length > 0 ? (
-        <div className="flex flex-col gap-4">
-          {packages.map((pkg) => (
-            <Card key={pkg.id} className="overflow-hidden flex flex-col sm:flex-row w-full">
-              {/* Image - Left side */}
-              <div className="relative h-40 sm:h-auto sm:w-1/3 overflow-hidden">
-                {pkg.images && pkg.images.length > 0 ? (
-                  <img 
-                    src={pkg.images[0]} 
-                    alt={pkg.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : pkg.thumbnailImage ? (
-                  <img 
-                    src={pkg.thumbnailImage} 
-                    alt={pkg.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gradient-to-r from-blue-100 to-blue-50 flex items-center justify-center">
-                    <span className="text-blue-800 font-medium">{pkg.name}</span>
-                  </div>
-                )}
-                
-                {/* Event type badge */}
-                <Badge className="absolute top-2 left-2 bg-white/80 text-blue-800">
-                  {pkg.eventType}
-                </Badge>
+    <>
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-semibold">Service Packages</h3>
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-500">Sort by:</div>
+              <div className="flex space-x-2">
+                <Button 
+                  variant={sortBy === 'name' ? "default" : "outline"} 
+                  size="sm" 
+                  onClick={() => handleSort('name')}
+                  className="h-8"
+                >
+                  Name
+                  {sortBy === 'name' && (
+                    <ArrowUpDown className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+                <Button 
+                  variant={sortBy === 'price' ? "default" : "outline"} 
+                  size="sm" 
+                  onClick={() => handleSort('price')}
+                  className="h-8"
+                >
+                  Price
+                  {sortBy === 'price' && (
+                    <ArrowUpDown className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
               </div>
-              
-              {/* Content - Right side */}
-              <div className="flex flex-col sm:w-2/3">
-                <CardContent className="p-4 flex-grow flex items-center">
-                  <div className="flex justify-between items-center w-full">
-                    <div>
-                      <h3 className="font-semibold text-lg">{pkg.name}</h3>
-                      <div className="mt-1 flex items-center">
-                        <Tag className="h-3 w-3 mr-1 text-blue-600" />
-                        <span className="text-sm text-blue-600">Suitable for: {pkg.eventType}</span>
+            </div>
+          </div>
+          
+          {/* Display selected date banner if a date is selected */}
+          {selectedDate && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-3 flex items-center">
+              <Calendar className="h-5 w-5 text-blue-500 mr-2" />
+              <div>
+                <p className="text-blue-700 font-medium">
+                  Selected date: {new Date(selectedDate).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <p className="text-sm text-blue-600">Select a package below to book for this date</p>
+              </div>
+            </div>
+          )}
+          
+          {packages && packages.length > 0 ? (
+            <div className="space-y-6">
+              {sortedPackages.map((pkg) => (
+                <div 
+                  key={pkg.id} 
+                  className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white"
+                >
+                  {/* Package content */}
+                  <div className="grid md:grid-cols-3 gap-4 p-4">
+                    {/* Package image and name */}
+                    <div className="flex items-center space-x-4 col-span-1">
+                      <div className="h-20 w-20 rounded-md overflow-hidden flex-shrink-0 border border-gray-200">
+                        <img 
+                          src={pkg.images && pkg.images.length > 0 ? pkg.images[0] : provider.profileImage || '/placeholder-package.jpg'} 
+                          alt={pkg.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-lg mb-1">{pkg.name}</h4>
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+                          {pkg.eventType}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="font-semibold text-lg text-blue-900">
-                      {formatPrice(pkg.price, pkg.currency)}
+                    
+                    {/* Package details */}
+                    <div className="grid grid-cols-2 gap-4 col-span-2">
+                      {/* Description */}
+                      <div className="col-span-2 md:col-span-1">
+                        <p className="text-gray-600 text-sm line-clamp-3">{pkg.description}</p>
+                      </div>
+                      
+                      {/* Details */}
+                      <div className="grid grid-cols-2 gap-3 col-span-2 md:col-span-1">
+                        <div className="bg-gray-50 p-3 rounded-md flex items-center">
+                          <Users className="text-blue-500 h-5 w-5 mr-2" />
+                          <div>
+                            <div className="text-xs text-gray-500">Capacity</div>
+                            <div className="font-medium">{pkg.capacity.min} - {pkg.capacity.max}</div>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-md flex items-center">
+                          <DollarSign className="text-green-500 h-5 w-5 mr-2" />
+                          <div>
+                            <div className="text-xs text-gray-500">Price</div>
+                            <div className="font-medium text-green-600">
+                              {formatPrice(pkg.price, pkg.currency)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </CardContent>
-                
-                <CardFooter className="p-4 border-t">
-                  <div className="flex flex-wrap gap-2 w-full justify-between sm:justify-end">
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleViewDetails(pkg)}
-                      className="sm:mr-auto"
-                    >
-                      View Details
-                    </Button>
-                    
-                    <Button 
-                      variant="secondary"
-                      onClick={() => handleAddToCart(pkg)}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      Add to Cart
-                    </Button>
-                    
-                    <Button 
-                      onClick={() => handleBookNow(pkg)}
-                    >
-                      Book Now
-                    </Button>
+                  
+                  {/* Action buttons - positioned at bottom */}
+                  <div className="bg-gray-50 p-3 border-t flex justify-between items-center">
+                    <div>
+                      <Button variant="outline" size="sm" onClick={() => openQuickView(pkg)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                    </div>
+                    <div className="flex space-x-3">
+                      <Button variant="secondary" size="sm" onClick={() => handleAddToCart(pkg)}>
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleBookNow(pkg)}
+                        className={selectedDate ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {selectedDate ? "Book for Selected Date" : "Book Now"}
+                      </Button>
+                    </div>
                   </div>
-                </CardFooter>
+                  
+                  {/* Show selected date indicator if a date is selected */}
+                  {selectedDate && (
+                    <div className="bg-blue-50 p-2 border-t border-blue-100 text-xs text-blue-600 text-center">
+                      <Info className="h-3 w-3 inline-block mr-1" />
+                      This package will be booked for {new Date(selectedDate).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="inline-block p-3 bg-gray-100 rounded-full mb-3">
+                <ShoppingCart className="h-6 w-6 text-gray-400" />
               </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 border border-dashed rounded-lg bg-gray-50">
-          <h3 className="text-lg font-medium text-gray-700 mb-2">No Packages Available</h3>
-          <p className="text-gray-500 mb-6">This service provider has not created any packages yet.</p>
-          <p className="text-sm text-gray-600">
-            Feel free to contact them to discuss custom services for your event.
-          </p>
-        </div>
-      )}
-
-      {/* Package Quick View Popup */}
+              <p className="text-gray-500">No packages available from this service provider</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
       {selectedPackage && (
         <PackageQuickView
           package={selectedPackage}
@@ -352,17 +301,9 @@ export const PackagesTab = ({ provider }: PackagesTabProps) => {
           onClose={() => setQuickViewOpen(false)}
           onAddToCart={handleAddToCart}
           onBookNow={handleBookNow}
+          selectedDate={selectedDate}
         />
       )}
-      
-      {/* Direct Booking Form */}
-      {selectedPackage && (
-        <SystemBookingForm
-          isOpen={bookingFormOpen}
-          onClose={() => setBookingFormOpen(false)}
-          selectedPackage={selectedPackage}
-        />
-      )}
-    </div>
+    </>
   );
 };
