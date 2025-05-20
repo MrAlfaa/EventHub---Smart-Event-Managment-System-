@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import users, auth, providers, admin, promotions, reviews, chat, bookings, provider_bookings, packages
-from app.api.routes import files, cloud_storage  # Add cloud_storage import
+from app.api.routes import files, cloud_storage, notifications  # Add notifications import
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 app = FastAPI(title="EventHub API")
@@ -37,7 +37,8 @@ app.include_router(bookings.router, prefix=settings.API_V1_STR)
 app.include_router(provider_bookings.router, prefix=settings.API_V1_STR)
 app.include_router(packages.router, prefix=settings.API_V1_STR)
 app.include_router(files.router, prefix=settings.API_V1_STR)
-app.include_router(cloud_storage.router, prefix=settings.API_V1_STR)  # Add cloud_storage router
+app.include_router(cloud_storage.router, prefix=settings.API_V1_STR)
+app.include_router(notifications.router, prefix=settings.API_V1_STR)  # Add notifications router
 
 # Add debug route at root level
 @app.get("/debug-routes")

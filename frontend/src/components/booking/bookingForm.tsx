@@ -112,6 +112,11 @@ export const BookingForm: React.FC<BookingFormProps> = ({
       };
 
       onComplete(bookingData);
+    
+      // Show a toast notification
+      toast.success(`Booking request sent! The service provider will be notified.`, {
+        duration: 5000,
+      });
     } else {
       // Scroll to the first error
       const firstErrorField = Object.keys(errors)[0];

@@ -6,6 +6,7 @@ from app.models.user import UserInDB
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 from typing import List
+from app.models.notification import NotificationCreate
 
 router = APIRouter()
 
@@ -47,6 +48,28 @@ async def create_booking(
     
     # Get the inserted booking
     booking = await db.bookings.find_one({"_id": result.inserted_id})
+    
+    # Try to get package name from the packageId
+    package_name = "your service"
+    if "packageId" in new_booking:
+        package = await db.provider_packages.find_one({"_id": ObjectId(new_booking["packageId"])})
+        if package and "name" in package:
+            package_name = package["name"]
+    
+    # Create notification for provider
+    notification = {
+        "recipient_id": booking_data.providerId,
+        "type": "booking",
+        "title": "New Booking Request",
+        "message": f"{current_user.name} has requested {package_name} for {booking_data.eventDate.strftime('%B %d, %Y')}",
+        "reference_id": str(booking["_id"]),
+        "reference_type": "booking",
+        "is_read": False,
+        "created_at": datetime.utcnow()
+    }
+    
+    # Insert notification
+    await db.notifications.insert_one(notification)
     
     # Convert ObjectId to string
     if booking:
