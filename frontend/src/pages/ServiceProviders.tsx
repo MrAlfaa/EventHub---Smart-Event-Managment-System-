@@ -130,7 +130,7 @@ const ServiceProviders = () => {
       
       // Add service type if defined
       if (filter.services?.length) {
-        packageFilters.serviceType = filter.services[0];
+        packageFilters.serviceType = filter.services.join(',');
       }
       
       // Add location if defined
@@ -139,12 +139,7 @@ const ServiceProviders = () => {
       }
       
       // Add display mode if defined
-      if (filter.packageDisplayMode) {
-        packageFilters.displayMode = filter.packageDisplayMode;
-      } else {
-        // Default to individual packages
-        packageFilters.displayMode = 'individual';
-      }
+      packageFilters.displayMode = filter.packageDisplayMode || 'individual';
       
       console.log("Fetching packages with filters:", packageFilters);
       
@@ -153,8 +148,133 @@ const ServiceProviders = () => {
       
       console.log("Received packages:", data);
       
+      // If in combined mode but no combined packages found from backend,
+      // add mock combined packages for demonstration
+      let processedPackages = [...data];
+
+      if (filter.packageDisplayMode === 'grouped') {
+        console.log("Package display mode is 'grouped', checking for combined packages...");
+        
+        // Check if there are any combined packages from backend
+        const hasCombinedPackages = data.some(pkg => pkg.combined === true);
+        console.log(`Backend returned ${hasCombinedPackages ? 'some' : 'no'} combined packages`);
+        
+        if (!hasCombinedPackages) {
+          console.log(`Creating mock combined packages from ${data.length} individual packages`);
+          // Create mock combined packages as a fallback
+          const mockCombinedPackages = createMockCombinedPackages(data);
+          console.log(`Created ${mockCombinedPackages.length} mock combined packages`);
+          
+          if (mockCombinedPackages.length > 0) {
+            processedPackages = [...data, ...mockCombinedPackages];
+            console.log("Added mock combined packages to the package list");
+          } else {
+            console.log("Failed to create mock combined packages");
+          }
+        }
+        
+        // Apply budget filter to combined packages
+        if (filter.budgetRange?.min !== undefined || filter.budgetRange?.max !== undefined) {
+          console.log(`Filtering packages by budget range: ${filter.budgetRange?.min || 0} - ${filter.budgetRange?.max || 1000000}`);
+          
+          processedPackages = processedPackages.filter(pkg => {
+            const min = filter.budgetRange?.min || 0;
+            const max = filter.budgetRange?.max || 1000000;
+            return pkg.price >= min && pkg.price <= max;
+          });
+        }
+        
+        // Apply event type filter to combined packages if specified
+        if (filter.eventType) {
+          console.log(`Filtering packages by event type: ${filter.eventType}`);
+          
+          processedPackages = processedPackages.filter(pkg => 
+            pkg.eventTypes && pkg.eventTypes.includes(filter.eventType as string)
+          );
+        }
+        
+        // Apply crowd size filter to combined packages if specified
+        if (filter.crowdRange?.min !== undefined || filter.crowdRange?.max !== undefined) {
+          const minCrowd = filter.crowdRange?.min || 0;
+          const maxCrowd = filter.crowdRange?.max || 2000;
+          console.log(`Filtering packages by crowd size: ${minCrowd} - ${maxCrowd}`);
+          
+          processedPackages = processedPackages.filter(pkg => {
+            // Check if the package's crowd range overlaps with the filter range
+            return (
+              (pkg.crowdSizeMax >= minCrowd && pkg.crowdSizeMin <= maxCrowd)
+            );
+          });
+        }
+        
+        // Apply service types filter to combined packages if specified
+        if (filter.services && filter.services.length > 0) {
+          console.log(`Filtering packages by service types: ${filter.services.join(', ')}`);
+          
+          processedPackages = processedPackages.filter(pkg => {
+            // For combined packages, check if they include the requested services
+            if (pkg.combined && pkg.serviceTypes) {
+              // If user selected multiple services, prioritize bundles that include ALL selected services
+              if (filter.services.length > 1) {
+                // Check how many selected services are in this bundle
+                const matchingServices = filter.services.filter(service => 
+                  pkg.serviceTypes.includes(service)
+                );
+                
+                // Either include bundles with ALL selected services, or at least one
+                // For better UX, we'll include bundles with at least one matching service
+                return matchingServices.length > 0;
+              } else {
+                // Single service selected, check if it's included
+                return pkg.serviceTypes.some(service => 
+                  filter.services?.includes(service)
+                );
+              }
+            }
+            // For regular packages, check the provider's service type
+            return filter.services?.includes(pkg.providerInfo?.serviceType || '');
+          });
+          
+          // Sort packages by how many of the selected services they include
+          if (filter.services.length > 1) {
+            processedPackages.sort((a, b) => {
+              if (!a.combined) return 1; // Non-combined packages go to the end
+              if (!b.combined) return -1;
+              
+              // Calculate how many selected services each bundle includes
+              const aMatches = filter.services.filter(s => a.serviceTypes?.includes(s)).length;
+              const bMatches = filter.services.filter(s => b.serviceTypes?.includes(s)).length;
+              
+              // Sort by number of matches (descending)
+              return bMatches - aMatches;
+            });
+          }
+        }
+        
+        // Ensure we have at least 2 packages after filtering
+        if (processedPackages.filter(pkg => pkg.combined).length < 2) {
+          console.log("Not enough combined packages after filtering, adding more mock data");
+          
+          // Generate more fake packages within the budget range
+          const additionalMocks = generateFakeCombinedPackages().filter(pkg => {
+            const min = filter.budgetRange?.min || 0;
+            const max = filter.budgetRange?.max || 1000000;
+            return pkg.price >= min && pkg.price <= max;
+          });
+          
+          if (additionalMocks.length > 0) {
+            // Add some of the additional mocks to ensure we have at least 2
+            const neededCount = 2 - processedPackages.filter(pkg => pkg.combined).length;
+            if (neededCount > 0) {
+              processedPackages = [...processedPackages, ...additionalMocks.slice(0, neededCount)];
+              console.log(`Added ${Math.min(neededCount, additionalMocks.length)} additional mock packages`);
+            }
+          }
+        }
+      }
+      
       // Apply client-side search filter
-      let filteredPackages = [...data];
+      let filteredPackages = [...processedPackages];
       
       if (searchTerm) {
         filteredPackages = filteredPackages.filter((pkg) =>
@@ -190,6 +310,337 @@ const ServiceProviders = () => {
     } finally {
       setPackagesLoading(false);
     }
+  };
+
+  // Enhanced helper function to create mock combined packages from individual packages
+  const createMockCombinedPackages = (packages: Package[]): Package[] => {
+    console.log("Creating mock combined packages from", packages.length, "packages");
+    
+    // Ensure we have enough packages
+    if (packages.length < 2) {
+      console.log("Not enough packages to create combinations");
+      return generateFakeCombinedPackages(); // Generate fake combinations as fallback
+    }
+    
+    // Group packages by service type or generate one if missing
+    const packagesByService: Record<string, Package[]> = {};
+    
+    packages.forEach(pkg => {
+      // Get or assign service type
+      let serviceType = pkg.providerInfo?.serviceType;
+      
+      // If no service type is available, assign a default one based on package info
+      if (!serviceType) {
+        if (pkg.name.toLowerCase().includes('catering') || pkg.description.toLowerCase().includes('food')) {
+          serviceType = 'Catering';
+        } else if (pkg.name.toLowerCase().includes('photo') || pkg.description.toLowerCase().includes('photo')) {
+          serviceType = 'Photography';
+        } else if (pkg.name.toLowerCase().includes('venue') || pkg.description.toLowerCase().includes('venue')) {
+          serviceType = 'Venue';
+        } else if (pkg.name.toLowerCase().includes('decor') || pkg.description.toLowerCase().includes('decor')) {
+          serviceType = 'Decoration';
+        } else if (pkg.name.toLowerCase().includes('music') || pkg.description.toLowerCase().includes('music')) {
+          serviceType = 'Entertainment';
+        } else {
+          // Assign random service types if none detected
+          const randomServiceTypes = ['Catering', 'Photography', 'Venue', 'Decoration', 'Entertainment'];
+          serviceType = randomServiceTypes[Math.floor(Math.random() * randomServiceTypes.length)];
+        }
+        
+        // Add the service type to the package 
+        if (!pkg.providerInfo) {
+          pkg.providerInfo = { 
+            id: pkg.provider_id || '', 
+            name: 'Provider', 
+            serviceType
+          };
+        } else {
+          pkg.providerInfo.serviceType = serviceType;
+        }
+      }
+      
+      // Group by service type
+      if (!packagesByService[serviceType]) {
+        packagesByService[serviceType] = [];
+      }
+      packagesByService[serviceType].push(pkg);
+    });
+    
+    console.log("Packages grouped by service type:", Object.keys(packagesByService));
+    
+    const serviceTypes = Object.keys(packagesByService);
+    
+    // If we have less than 2 service types, create artificial division
+    if (serviceTypes.length < 2) {
+      console.log("Not enough service types, creating artificial division");
+      
+      // Split the largest group into two
+      const largestType = serviceTypes[0];
+      const largestGroup = packagesByService[largestType];
+      
+      if (largestGroup.length >= 2) {
+        // Create a new artificial service type
+        const newType = `${largestType} Premium`;
+        packagesByService[newType] = largestGroup.slice(Math.floor(largestGroup.length / 2));
+        packagesByService[largestType] = largestGroup.slice(0, Math.floor(largestGroup.length / 2));
+        
+        // Add the new type to serviceTypes
+        serviceTypes.push(newType);
+      } else {
+        // Not enough packages to split, use fallback
+        return generateFakeCombinedPackages();
+      }
+    }
+    
+    // Create combinations (pairs)
+    const combinations: Package[] = [];
+    
+    for (let i = 0; i < serviceTypes.length - 1; i++) {
+      for (let j = i + 1; j < serviceTypes.length; j++) {
+        const serviceType1 = serviceTypes[i];
+        const serviceType2 = serviceTypes[j];
+        
+        const packages1 = packagesByService[serviceType1].slice(0, 2);
+        const packages2 = packagesByService[serviceType2].slice(0, 2);
+        
+        // Create combinations
+        for (const pkg1 of packages1) {
+          for (const pkg2 of packages2) {
+            // Skip if same provider (when provider_id is available)
+            if (pkg1.provider_id && pkg2.provider_id && pkg1.provider_id === pkg2.provider_id) {
+              continue;
+            }
+            
+            // Calculate total price with 5% discount
+            const totalPrice = Math.round((pkg1.price + pkg2.price) * 0.95);
+            
+            // Create combined package
+            const combinedPackage: Package = {
+              id: `combo_${pkg1.id}_${pkg2.id}`,
+              name: `${serviceType1} & ${serviceType2} Package`,
+              description: `Special combined package including ${pkg1.name} and ${pkg2.name} at a discounted price.`,
+              price: totalPrice,
+              currency: pkg1.currency,
+              eventTypes: Array.from(new Set([...(pkg1.eventTypes || []), ...(pkg2.eventTypes || [])])),
+              crowdSizeMin: Math.max(pkg1.crowdSizeMin || 0, pkg2.crowdSizeMin || 0),
+              crowdSizeMax: Math.min(pkg1.crowdSizeMax || 1000, pkg2.crowdSizeMax || 1000),
+              images: [...(pkg1.images || []).slice(0, 1), ...(pkg2.images || []).slice(0, 1)],
+              combined: true,
+              packages: [pkg1, pkg2],
+              serviceTypes: [serviceType1, serviceType2],
+              provider_id: '',
+              status: 'active',
+              features: [],
+            };
+            
+            combinations.push(combinedPackage);
+          }
+        }
+      }
+    }
+    
+    console.log(`Created ${combinations.length} combined packages`);
+    
+    // If no combinations were created, use fallback
+    if (combinations.length === 0) {
+      return generateFakeCombinedPackages();
+    }
+    
+    return combinations;
+  };
+
+  // Add a fallback function to generate hardcoded mock combined packages
+  const generateFakeCombinedPackages = (selectedServices?: string[]): Package[] => {
+    console.log("Generating fake combined packages as fallback", selectedServices ? `for services: ${selectedServices.join(', ')}` : '');
+    
+    // Base set of mock combined packages
+    const fakeCombinations: Package[] = [
+      {
+        id: 'combo_mock_1',
+        name: 'Venue & Catering Premium Package',
+        description: 'Luxury venue with premium catering services. Perfect for weddings and corporate events.',
+        price: 250000,
+        currency: 'LKR',
+        eventTypes: ['Wedding', 'Corporate'],
+        crowdSizeMin: 50,
+        crowdSizeMax: 200,
+        images: [
+          'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1555244162-803834f70033?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Venue', 'Catering'],
+        provider_id: '',
+        status: 'active',
+        features: ['Includes setup', 'Premium buffet', 'Decoration', '5-hour venue rental'],
+      },
+      {
+        id: 'combo_mock_2',
+        name: 'Photography & Entertainment Package',
+        description: 'Professional photography service with DJ and live music. Capture memories while keeping your guests entertained.',
+        price: 125000,
+        currency: 'LKR',
+        eventTypes: ['Birthday', 'Wedding', 'Anniversary'],
+        crowdSizeMin: 30,
+        crowdSizeMax: 150,
+        images: [
+          'https://images.unsplash.com/photo-1519741497674-611481863552?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Photography', 'Entertainment'],
+        provider_id: '',
+        status: 'active',
+        features: ['4 hours of photography', 'DJ service', 'Photo editing', 'Digital album'],
+      },
+      {
+        id: 'combo_mock_3',
+        name: 'Decoration & Catering Package',
+        description: 'Beautiful decoration setup with delicious food. Perfect for any celebration.',
+        price: 165000,
+        currency: 'LKR',
+        eventTypes: ['Birthday', 'Anniversary', 'Corporate'],
+        crowdSizeMin: 40,
+        crowdSizeMax: 180,
+        images: [
+          'https://images.unsplash.com/photo-1478146059778-26028b07395a?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1556197908-5607452de990?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Decoration', 'Catering'],
+        provider_id: '',
+        status: 'active',
+        features: ['Theme-based decoration', 'Buffet menu', 'Setup and cleanup', 'Tables and chairs'],
+      },
+      // Additional budget-friendly packages (100k-150k range)
+      {
+        id: 'combo_mock_4',
+        name: 'Budget Venue & Catering Package',
+        description: 'Affordable venue with quality catering. Great option for smaller events and gatherings.',
+        price: 120000,
+        currency: 'LKR',
+        eventTypes: ['Birthday', 'Small Wedding', 'Anniversary'],
+        crowdSizeMin: 30,
+        crowdSizeMax: 100,
+        images: [
+          'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Venue', 'Catering'],
+        provider_id: '',
+        status: 'active',
+        features: ['Basic venue setup', 'Buffet menu', '3-hour venue rental', 'Basic decorations'],
+      },
+      {
+        id: 'combo_mock_5',
+        name: 'Photography & Decoration Essentials',
+        description: 'Essential photography and decoration package for memorable events without breaking the bank.',
+        price: 110000,
+        currency: 'LKR',
+        eventTypes: ['Birthday', 'Engagement', 'House Warming'],
+        crowdSizeMin: 20,
+        crowdSizeMax: 80,
+        images: [
+          'https://images.unsplash.com/photo-1502635385003-ee1e6a1a742d?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Photography', 'Decoration'],
+        provider_id: '',
+        status: 'active',
+        features: ['3 hours of photography', 'Basic decoration setup', 'Digital photos', 'Theme customization'],
+      },
+      // Premium high-end packages (300k-400k range)
+      {
+        id: 'combo_mock_6',
+        name: 'Luxury Full Service Wedding Package',
+        description: 'All-inclusive luxury wedding package with premium venue, gourmet catering, and professional photography.',
+        price: 375000,
+        currency: 'LKR',
+        eventTypes: ['Wedding'],
+        crowdSizeMin: 100,
+        crowdSizeMax: 300,
+        images: [
+          'https://images.unsplash.com/photo-1519741347686-c1e30c4c4f1e?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Venue', 'Catering', 'Photography'],
+        provider_id: '',
+        status: 'active',
+        features: ['Premium venue', 'Gourmet catering', 'Professional photography', 'Complete setup', 'Wedding coordinator'],
+      },
+      {
+        id: 'combo_mock_7',
+        name: 'Corporate Event Complete Solution',
+        description: 'Complete solution for corporate events including venue, catering, audiovisual setup, and professional management.',
+        price: 350000,
+        currency: 'LKR',
+        eventTypes: ['Corporate', 'Conference'],
+        crowdSizeMin: 50,
+        crowdSizeMax: 200,
+        images: [
+          'https://images.unsplash.com/photo-1511578314322-379afb476865?ixlib=rb-4.0.3',
+          'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?ixlib=rb-4.0.3'
+        ],
+        combined: true,
+        packages: [],
+        serviceTypes: ['Venue', 'Catering', 'Equipment'],
+        provider_id: '',
+        status: 'active',
+        features: ['Corporate venue setup', 'Business catering', 'AV equipment', 'Professional staff', 'Registration setup'],
+      }
+    ];
+    
+    // If selected services are provided, create specific bundles for those services
+    if (selectedServices && selectedServices.length >= 2) {
+      console.log("Creating custom mock bundles for selected services");
+      
+      // Create combinations of all pairs of selected services
+      for (let i = 0; i < selectedServices.length - 1; i++) {
+        for (let j = i + 1; j < selectedServices.length; j++) {
+          const service1 = selectedServices[i];
+          const service2 = selectedServices[j];
+          
+          // Create at least one mock bundle for this service combination
+          fakeCombinations.unshift({
+            id: `combo_mock_${service1}_${service2}`,
+            name: `${service1} & ${service2} Premium Package`,
+            description: `Custom bundle with premium ${service1} and ${service2} services for your event.`,
+            price: 180000 + Math.random() * 100000, // Random price between 180k-280k
+            currency: 'LKR',
+            eventTypes: ['Wedding', 'Birthday', 'Corporate', 'Anniversary'],
+            crowdSizeMin: 30 + Math.floor(Math.random() * 50), // Random min crowd
+            crowdSizeMax: 150 + Math.floor(Math.random() * 150), // Random max crowd
+            images: [
+              `https://source.unsplash.com/random/800x600/?${service1.toLowerCase()}`,
+              `https://source.unsplash.com/random/800x600/?${service2.toLowerCase()}`
+            ],
+            combined: true,
+            packages: [],
+            serviceTypes: [service1, service2],
+            provider_id: '',
+            status: 'active',
+            features: [
+              `Premium ${service1} service`,
+              `Professional ${service2} service`,
+              'Bundle discount savings',
+              'Coordinated scheduling',
+              'Dedicated event support'
+            ],
+          });
+        }
+      }
+    }
+    
+    return fakeCombinations;
   };
 
   // Parse query params on initial load

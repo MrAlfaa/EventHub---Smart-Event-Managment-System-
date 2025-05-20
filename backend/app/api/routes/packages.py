@@ -19,6 +19,9 @@ async def get_all_available_packages(
     """Get all available packages with optional filtering"""
     db = await get_database()
     
+    # Log the received parameters
+    print(f"Received request with params: eventType={eventType}, minPrice={minPrice}, maxPrice={maxPrice}, crowdSize={crowdSize}, serviceType={serviceType}, location={location}, displayMode={displayMode}")
+    
     # Base query
     query = {"status": "active"}
     
@@ -93,29 +96,44 @@ async def get_all_available_packages(
             }
             
             package["providerInfo"] = provider_info
-            package["serviceType"] = service_type
+            package["serviceType"] = service_type  # Make sure serviceType is set at the package level too
         
-        result.append(package)
-    
+        result.append(package)    
     # If displayMode is grouped, create combined packages
-    if displayMode == "grouped" and maxPrice is not None:
-        combined_packages = await generate_package_combinations(result, maxPrice, serviceType)
+    if displayMode == "grouped":
+        print(f"Generating package combinations with max budget: {maxPrice}")
+        print(f"Number of packages before combination: {len(result)}")
+        
+        # Set a reasonable default max budget if none provided
+        actual_max_budget = maxPrice if maxPrice is not None else 500000
+        
+        combined_packages = await generate_package_combinations(result, actual_max_budget, serviceType)
+        print(f"Number of combinations generated: {len(combined_packages) if combined_packages else 0}")
+        
         if combined_packages:
             # Return both individual and combined packages
-            return combined_packages
+            print("Returning combined packages")
+            result.extend(combined_packages)  # Add combined packages to regular packages
+        else:
+            print("No valid combinations found, returning individual packages only")
     
     return result
     
 async def generate_package_combinations(packages, max_budget, service_filter=None):
     """Generate combinations of packages that fit within the budget"""
+    print(f"Running generate_package_combinations with {len(packages)} packages, max_budget={max_budget}, service_filter={service_filter}")
+    
     # Group packages by service type
     service_packages = {}
     for package in packages:
-        service_type = package.get("serviceType", "")
+        service_type = package.get("serviceType", "") or package.get("providerInfo", {}).get("serviceType", "")
         if service_type:
             if service_type not in service_packages:
                 service_packages[service_type] = []
             service_packages[service_type].append(package)
+    
+    # Log service types found
+    print(f"Found {len(service_packages)} unique service types: {list(service_packages.keys())}")
     
     # Get unique service types
     service_types = list(service_packages.keys())
@@ -127,48 +145,73 @@ async def generate_package_combinations(packages, max_budget, service_filter=Non
     requested_services = []
     if service_filter:
         requested_services = service_filter.split(',')
+        print(f"Requested service types: {requested_services}")
     
-    # Generate all possible combinations of 2 or more services
-    for i in range(2, len(service_types) + 1):
-        from itertools import combinations as combo_iter
-        # Get all combinations of i service types
-        for service_combo in combo_iter(service_types, i):
-            # Skip if requested services are specified and not all are in this combo
-            if requested_services and not all(s in service_combo for s in requested_services):
+    # Check if we have enough service types to make combinations
+    if len(service_types) < 2:
+        print("Not enough service types to generate combinations")
+        return []
+    
+    # Generate all possible combinations of 2 service types - limited to just pairs for simplicity
+    from itertools import combinations as combo_iter
+    for service_combo in combo_iter(service_types, 2):  # Just pairs to keep it simple
+        # Skip if requested services are specified and not all are in this combo
+        if requested_services and not all(s in service_combo for s in requested_services):
+            continue
+        
+        print(f"Trying combination of service types: {service_combo}")
+        
+        # Get all package combinations for these service types
+        packages_by_service = [service_packages[s] for s in service_combo]
+        
+        # Generate combinations of packages, one from each service type
+        from itertools import product
+        
+        # Limit the number of combinations to prevent excessive processing
+        max_packages_per_service = 3
+        limited_packages = [
+            service_pkgs[:max_packages_per_service] for service_pkgs in packages_by_service
+        ]
+        
+        combo_count = 0
+        for package_combo in product(*limited_packages):
+            # Skip combinations of packages from the same provider
+            provider_ids = [pkg.get("provider_id") for pkg in package_combo]
+            if len(set(provider_ids)) < len(provider_ids):
                 continue
-            
-            # Get all package combinations for these service types
-            packages_by_service = [service_packages[s] for s in service_combo]
-            
-            # Generate all combinations of packages, one from each service type
-            from itertools import product
-            for package_combo in product(*packages_by_service):
-                total_price = sum(pkg["price"] for pkg in package_combo)
                 
-                # Check if the combination fits the budget
-                if total_price <= max_budget:
-                    # Create a combined package
-                    service_names = [pkg.get("serviceType", "Service") for pkg in package_combo]
-                    combined_pkg = {
-                        "id": "_".join([pkg["id"] for pkg in package_combo]),
-                        "name": f"{' & '.join(service_names)} Package",
-                        "description": f"Combined package including {', '.join([pkg['name'] for pkg in package_combo])}",
-                        "price": total_price,
-                        "currency": package_combo[0]["currency"],
-                        "eventTypes": package_combo[0].get("eventTypes", []),
-                        "crowdSizeMin": max([pkg.get("crowdSizeMin", 0) for pkg in package_combo]),
-                        "crowdSizeMax": min([pkg.get("crowdSizeMax", 1000) for pkg in package_combo]),
-                        "images": [pkg.get("images", [])[0] if pkg.get("images") else None for pkg in package_combo if pkg.get("images")],
-                        "combined": True,
-                        "packages": list(package_combo),
-                        "serviceTypes": service_names
-                    }
-                    combinations.append(combined_pkg)
+            total_price = sum(pkg["price"] for pkg in package_combo)
+            
+            # Check if the combination fits the budget
+            if max_budget is None or total_price <= max_budget:
+                combo_count += 1
+                # Create a combined package
+                service_names = [s.capitalize() for s in service_combo]
+                combined_pkg = {
+                    "id": f"combo_{'_'.join([pkg['id'] for pkg in package_combo])}",
+                    "name": f"{' & '.join(service_names)} Package",
+                    "description": f"Combined package including {', '.join([pkg['name'] for pkg in package_combo])}",
+                    "price": total_price,
+                    "currency": package_combo[0]["currency"],
+                    "eventTypes": list(set([et for pkg in package_combo for et in pkg.get("eventTypes", [])])),
+                    "crowdSizeMin": max([pkg.get("crowdSizeMin", 0) for pkg in package_combo]),
+                    "crowdSizeMax": min([pkg.get("crowdSizeMax", 1000) for pkg in package_combo]),
+                    "images": [img for pkg in package_combo for img in pkg.get("images", [])[:1] if img],
+                    "combined": True,
+                    "packages": package_combo,
+                    "serviceTypes": service_names
+                }
+                combinations.append(combined_pkg)
+                
+                # Limit to at most 10 combinations per service pair
+                if combo_count >= 10:
+                    break
     
     # Sort combinations by price
     combinations.sort(key=lambda x: x["price"])
+    print(f"Total combinations generated: {len(combinations)}")
     
-    return combinations
+    return combinations    
 @router.get("/packages/{package_id}", response_model=dict)
 async def get_package_by_id(package_id: str):
     """Get a specific package by ID"""

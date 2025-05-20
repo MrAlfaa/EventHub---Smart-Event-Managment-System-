@@ -21,7 +21,7 @@ import {
   Tag,
   Package,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // Event types for filtering
 const EVENT_TYPES = [
@@ -152,15 +152,27 @@ export function FilterSidebar({
   
   // Handle package display mode change
   const handlePackageDisplayModeChange = (mode: 'individual' | 'grouped') => {
-    // If switching to grouped mode, ensure selected services are used for filtering
-    if (mode === 'grouped' && filter.services.length > 0) {
-      onFilterChange({ 
-        packageDisplayMode: mode,
-        packageFilter: filter.services.join(',')
-      });
-    } else {
-      onFilterChange({ packageDisplayMode: mode });
+    console.log(`Changing display mode to: ${mode}`);
+    
+    // When switching to grouped mode, make sure we have a reasonable budget range
+    if (mode === 'grouped') {
+      // If budget range is not yet set or is at max, provide a reasonable default
+      const currentMax = filter.budgetRange?.max || 1000000;
+      if (currentMax >= 1000000) {
+        // Set a reasonable budget range for package combinations
+        onFilterChange({ 
+          packageDisplayMode: mode,
+          budgetRange: { 
+            min: filter.budgetRange?.min || 0,
+            max: 400000 // A reasonable default upper limit for packages
+          } 
+        });
+        return;
+      }
     }
+    
+    // Otherwise just update the display mode
+    onFilterChange({ packageDisplayMode: mode });
   };
 
   // Inside render method, add a message for combined packages option
@@ -187,14 +199,14 @@ export function FilterSidebar({
             <div className="flex items-center space-x-2 mb-2">
               <RadioGroupItem value="grouped" id="grouped" />
               <Label htmlFor="grouped" className="text-sm cursor-pointer">
-                Show as Package
+                Show as Package Combinations
               </Label>
             </div>
           </RadioGroup>
           
           {filter.packageDisplayMode === 'grouped' && (
             <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
-              <p>Select 2+ service types and set a budget to see combined packages that fit your requirements.</p>
+              <p>Packages will be combined with others to create complete event solutions that fit your budget.</p>
             </div>
           )}
         </div>
@@ -384,52 +396,73 @@ export function FilterSidebar({
             </div>
           </AccordionContent>
         </AccordionItem>
-
-        {/* Package Display Mode - Only show in packages tab */}
-        {activeTab === "packages" && (
-          <AccordionItem value="package-mode">
-            <AccordionTrigger className="text-sm py-2">
-              <span className="flex items-center">
-                <Package className="h-4 w-4 mr-2" />
-                Display Mode
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="mt-2">
-                <RadioGroup
-                  value={filter.packageDisplayMode || 'individual'}
-                  onValueChange={handlePackageDisplayModeChange}
-                >
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="individual" id="individual" />
-                    <Label htmlFor="individual" className="text-sm cursor-pointer">
-                      Show Individual Packages
-                    </Label>
+          {/* Package Display Mode - Only show in packages tab */}
+          {activeTab === "packages" && (
+            <>
+              {/* Existing package filters */}
+            
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Package Display</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="display-individual"
+                      name="packageDisplay"
+                      checked={filter.packageDisplayMode === 'individual'}
+                      onChange={() => {
+                        console.log("Changing to individual display mode")
+                        onFilterChange({ packageDisplayMode: 'individual' })
+                      }}
+                    />
+                    <label htmlFor="display-individual" className="text-sm cursor-pointer">
+                      Individual Packages
+                    </label>
                   </div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <RadioGroupItem value="grouped" id="grouped" />
-                    <Label htmlFor="grouped" className="text-sm cursor-pointer">
-                      Show as Package
-                    </Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="display-grouped"
+                      name="packageDisplay"
+                      checked={filter.packageDisplayMode === 'grouped'}
+                      onChange={() => {
+                        console.log("Changing to grouped display mode")
+                        onFilterChange({ packageDisplayMode: 'grouped' })
+                      }}
+                    />
+                    <label htmlFor="display-grouped" className="text-sm cursor-pointer">
+                      Combined Packages
+                    </label>
                   </div>
-                </RadioGroup>
-                
+                </div>
+              
                 {filter.packageDisplayMode === 'grouped' && (
-                  <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
-                    <p>Select 2+ service types and set a budget to see combined packages that fit your requirements.</p>
+                  <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                    <p className="text-xs text-blue-700">
+                      Combined packages will show bundles of different services that fit within your budget range.
+                    </p>
                   </div>
                 )}
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        )}
-      </Accordion>
+            </>
+          )}
+        </Accordion>
       
       {/* Add Apply Filters button for both mobile and desktop */}
       <div className="mt-4 pt-4 border-t border-gray-200">
         <Button 
           className="w-full" 
-          onClick={isMobile ? onClose : undefined}
+          onClick={() => {
+            // If we're on the packages tab, ensure we fetch packages with the selected display mode
+            if (activeTab === "packages" && filter.packageDisplayMode === 'grouped') {
+              console.log("Applying combined package filter");
+            }
+            if (isMobile && onClose) {
+              onClose();
+            }
+          }}
         >
           Apply Filters
         </Button>
